@@ -1,4 +1,4 @@
-use std::f32::consts::SQRT_2;
+use std::{borrow::BorrowMut, f32::consts::SQRT_2};
 
 use crate::tensor::Tensor;
 
@@ -102,7 +102,7 @@ pub fn silu(y: &mut Tensor<f32>, x: &Tensor<f32>) {
     let y_data = unsafe { y.data_mut() };
     let x_data = x.data();
     for i in 0..x_data.len()  {
-        y_data[i]=y_data[i] *x_data[i] *1.0 / (1.0 + (-x_data[i]).exp())
+        y_data[i]=y_data[i] *x_data[i]/ (1.0 + (-x_data[i]).exp())
     }
 }
 
