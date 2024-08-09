@@ -5,7 +5,7 @@ use std::vec;
 
 use crate::config::LlamaConfigJson;
 use crate::kvcache::KVCache;
-use crate::operators::{self as OP, matmul_transb, rms_norm,silu};
+use crate::operators::{self as OP, masked_softmax, matmul_transb, rms_norm, silu};
 use crate::params::LLamaParams;
 use crate::tensor::Tensor;
 use safetensors::{tensor, SafeTensors};
@@ -54,12 +54,16 @@ impl Llama<f32> {
     pub fn new_cache(&self) -> KVCache<f32> {
         KVCache::new(self.n_layers, self.max_seq_len, self.n_kv_h * self.dqkv, 0)
     }
-
+// 推理单元重复使用
     pub fn forward(&self, input: &Tensor<u32>, cache: &mut KVCache<f32>) -> Tensor<f32> {
+        // 输入文本的长度
         let seq_len = input.size();
+        // 已经处理过的文本的长度
         let past_seq_len = cache.len();
+        // 更新已经处理过的文本的长度
         cache.increment(seq_len);
         let total_seq_len = past_seq_len + seq_len;
+        // 获取qkv的分组数
         let n_groups = self.n_q_h / self.n_kv_h;
 
         // Some pre-allocated buffers that will be reused
@@ -71,24 +75,27 @@ impl Llama<f32> {
         let mut gate_buf = Tensor::<f32>::default(&vec![seq_len, self.di]);
         let mut up_buf = Tensor::<f32>::default(&vec![seq_len, self.di]);
 
-        // Computation Starts Here
-        // Embedding lookup
-        OP::gather(&mut residual, input, &self.params.embedding_table);
+        // Computation Starts Here 进行推理
+        // Embedding lookup 
+        OP::gather(&mut residual, input, &self.params.embedding_table);// 获取文本的词向量
 
         for layer in 0..self.n_layers {
+            // 归一化
             OP::rms_norm(
                 &mut hidden_states,
                 &residual,
                 &self.params.rms_att_w[layer],
                 self.eps,
             );
-
+            // 初始化qkv，kv从cache中获取
             let q = (&mut q_buf).reshape(&vec![seq_len, self.n_q_h * self.dqkv]); // (seq, n_h * dqkv)
             let k = &mut cache.k_cache(layer, past_seq_len); // (seq, n_kv_h * dqkv)
             let v = &mut cache.v_cache(layer, past_seq_len); // (seq, n_kv_h * dqkv)
+            // 进行矩阵乘
             OP::matmul_transb(q, 0., &hidden_states, &self.params.wq[layer], 1.0);
             OP::matmul_transb(k, 0., &hidden_states, &self.params.wk[layer], 1.0);
             OP::matmul_transb(v, 0., &hidden_states, &self.params.wv[layer], 1.0);
+            //  just apply rope to q and k
             OP::rope(
                 q.reshape(&vec![seq_len, self.n_q_h, self.dqkv]),
                 past_seq_len,
@@ -102,10 +109,13 @@ impl Llama<f32> {
 
             let full_k = &mut cache.k_cache(layer, 0); // (total_seq, n_kv_h * dqkv)
             let full_v = &mut cache.v_cache(layer, 0); // (total_seq, n_kv_h * dqkv)
-
-            todo!("self_attention(...)");
+            // self_attention
+            {
+                matmul_transb(&mut att_scores, 0., q, k, 1.);
+                masked_softmax(&mut att_scores);
+                matmul_transb(&mut residual, 1., &hidden_states, &self.params.wo[layer], 1.)
+            }
             todo!("down_proj matmul and add residual");
-
             todo!("mlp(...)");
         }
 
@@ -136,8 +146,11 @@ impl Llama<f32> {
         temperature: f32,
     ) -> Vec<u32>{
         let mut result = Vec::<u32>::new();
-        
-        todo!("实现文本生成");
+        let mut cache= self.new_cache();
+        let input = Tensor::<u32>::new(Vec::from(token_ids), &vec![token_ids.len()]);
+        for _ in 0..max_len  {
+          let tmp=self.forward(&input, &mut cache);
+        }
         
         result
     }
@@ -146,7 +159,7 @@ impl Llama<f32> {
 fn self_attention(
     hidden_states: &mut Tensor<f32>, // (seq, n_kv_h * n_groups * dqkv)
     att_scores: &mut Tensor<f32>,    // (n_kv_h, n_groups, seq, total_seq)
-    q: &Tensor<f32>,                 // (seq, n_kv_h * n_groups * dqkv)
+    q: &Tensor<f32>,                 // (seq, n_kv_h * n_groups * dqkv)  (seq_len, q_head×dim) 
     k: &Tensor<f32>,                 // (total_seq, n_kv_h * dqkv)
     v: &Tensor<f32>,                 // (total_seq, n_kv_h * dqkv)
     n_kv_h: usize,
@@ -155,9 +168,6 @@ fn self_attention(
     total_seq_len: usize,
     dqkv: usize,
 ) {
-    
-
-    todo!("Implement self_attention");
 }
 
 fn mlp(
