@@ -114,13 +114,13 @@ pub fn matmul_transb(c: &mut Tensor<f32>, beta: f32, a: &Tensor<f32>, b: &Tensor
     let mut matmul_transb=0;
    
     // 判断是否存维度是否相同，默认a的范围更大
-    if a.shape()[1]!=b.shape()[0] {
+    if a.shape()[1]!=b.shape()[1] {
         // 默认能除尽
         matmul_transb=a.shape()[1]/b.shape()[0];
     }    
     // 计算 num 是 multiple 的几倍
     // 默认当二维数组处理
-    let shape = vec![a.shape()[0],b.shape()[1]];
+    let shape = vec![a.shape()[0],b.shape()[0]];
     let mid=a.shape()[1];
     let c_data=unsafe { c.data_mut() };
     let mut offset=0;
