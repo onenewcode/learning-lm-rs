@@ -15,8 +15,10 @@ pub struct Llama<T> {
     n_layers: usize,        // number of layers
     n_q_h: usize,           // number of heads for q
     n_kv_h: usize,          // number of heads for k and v
+    /// 隐藏状态的维度
     d: usize,               // dimension of hidden states
     dqkv: usize,            // length of a single q, k, or v vector
+    /// mlp中间状态的维度
     di: usize,              // dimension of intermediate states
     eps: f32,               // epsilon for RMS normalization
     rope_theta: f32,        // rope theta for rope initialization
@@ -57,19 +59,21 @@ impl Llama<f32> {
 // 推理单元重复使用
     pub fn forward(&self, input: &Tensor<u32>, cache: &mut KVCache<f32>) -> Tensor<f32> {
         // 输入文本的长度
-        let seq_len = input.size();
+        let seq_len = input.size(); // 默认解码长度为6
         // 已经处理过的文本的长度
         let past_seq_len = cache.len();
         // 更新已经处理过的文本的长度
         cache.increment(seq_len);
         let total_seq_len = past_seq_len + seq_len;
-        // 获取qkv的分组数
+        // 用于判断多少个q，对应一个kv
         let n_groups = self.n_q_h / self.n_kv_h;
 
         // Some pre-allocated buffers that will be reused
         let mut residual = Tensor::<f32>::default(&vec![seq_len, self.d]);
         let mut hidden_states = Tensor::<f32>::default(&vec![seq_len, self.d]);
+        // shape 6*128
         let mut q_buf = Tensor::<f32>::default(&vec![seq_len, self.n_q_h * self.dqkv]);
+        // shape 4*2*6*6
         let mut att_scores =
             Tensor::<f32>::default(&vec![self.n_kv_h, n_groups, seq_len, total_seq_len]);
         let mut gate_buf = Tensor::<f32>::default(&vec![seq_len, self.di]);
@@ -88,14 +92,16 @@ impl Llama<f32> {
                 self.eps,
             );
             // 初始化qkv，kv从cache中获取
+            // shape 6*128
             let q = (&mut q_buf).reshape(&vec![seq_len, self.n_q_h * self.dqkv]); // (seq, n_h * dqkv)
+            // shape 6*64
             let k = &mut cache.k_cache(layer, past_seq_len); // (seq, n_kv_h * dqkv)
             let v = &mut cache.v_cache(layer, past_seq_len); // (seq, n_kv_h * dqkv)
-            // 进行矩阵乘
+            // 这里我们的wq的矩阵和
             OP::matmul_transb(q, 0., &hidden_states, &self.params.wq[layer], 1.0);
             OP::matmul_transb(k, 0., &hidden_states, &self.params.wk[layer], 1.0);
             OP::matmul_transb(v, 0., &hidden_states, &self.params.wv[layer], 1.0);
-            //  just apply rope to q and k
+            //  每个词向量对应的查询矩阵
             OP::rope(
                 q.reshape(&vec![seq_len, self.n_q_h, self.dqkv]),
                 past_seq_len,
@@ -111,12 +117,16 @@ impl Llama<f32> {
             let full_v = &mut cache.v_cache(layer, 0); // (total_seq, n_kv_h * dqkv)
             // self_attention
             {
-                matmul_transb(&mut att_scores, 0., q, k, 1.);
+                // 逐个计算词，在不同头的得分
+                // score = Q @ K.T / sqrt(dim) 
+                // 这里需要手动
+                matmul_transb(&mut att_scores, 0., q, full_k, 1.);
+                
                 masked_softmax(&mut att_scores);
                 matmul_transb(&mut residual, 1., &hidden_states, &self.params.wo[layer], 1.)
             }
-            todo!("down_proj matmul and add residual");
-            todo!("mlp(...)");
+            // todo!("down_proj matmul and add residual");
+            // todo!("mlp(...)");
         }
 
         // No matter what seq_len, the output is always a 1D vector of length vocab,

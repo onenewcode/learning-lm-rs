@@ -1,7 +1,7 @@
-use std::{borrow::BorrowMut, f32::consts::SQRT_2};
+use std::{borrow::BorrowMut, f32::consts::SQRT_2, vec};
 
 use crate::tensor::Tensor;
-
+/// 获取编码后，每个词代表的向量，组成一个矩阵
 // get (row) vectors from a 2D table given a list of indices
 pub fn gather(y: &mut Tensor<f32>, indices: &Tensor<u32>, table: &Tensor<f32>) {
     let length = indices.size();
@@ -109,8 +109,18 @@ pub fn silu(y: &mut Tensor<f32>, x: &Tensor<f32>) {
 // C = beta * C + alpha * A @ B^T
 // hint: You don't need to do an explicit transpose of B
 pub fn matmul_transb(c: &mut Tensor<f32>, beta: f32, a: &Tensor<f32>, b: &Tensor<f32>, alpha: f32) {
+    assert!(b.shape().len()==2,"matmul_transb of dimensions must be at least 2");
+    assert!(a.shape().len()==2,"matmul_transb of dimensions must be at least 2");
+    let mut matmul_transb=0;
+   
+    // 判断是否存维度是否相同，默认a的范围更大
+    if a.shape()[1]!=b.shape()[0] {
+        // 默认能除尽
+        matmul_transb=a.shape()[1]/b.shape()[0];
+    }    
+    // 计算 num 是 multiple 的几倍
     // 默认当二维数组处理
-    let shape = c.shape().clone();
+    let shape = vec![a.shape()[0],b.shape()[1]];
     let mid=a.shape()[1];
     let c_data=unsafe { c.data_mut() };
     let mut offset=0;
