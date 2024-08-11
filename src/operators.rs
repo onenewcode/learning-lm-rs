@@ -111,12 +111,8 @@ pub fn silu(y: &mut Tensor<f32>, x: &Tensor<f32>) {
 pub fn matmul_transb(c: &mut Tensor<f32>, beta: f32, a: &Tensor<f32>, b: &Tensor<f32>, alpha: f32) {
     assert!(b.shape().len()==2,"matmul_transb of dimensions must be at least 2");
     assert!(a.shape().len()==2,"matmul_transb of dimensions must be at least 2");
-    let mut matmul_transb=0;
-   
-    // 判断是否存维度是否相同，默认a的范围更大
     if a.shape()[1]!=b.shape()[1] {
-        // 默认能除尽
-        matmul_transb=a.shape()[1]/b.shape()[0];
+       panic!("matmul_transb of 大小不相同");
     }    
     // 计算 num 是 multiple 的几倍
     // 默认当二维数组处理
@@ -124,6 +120,7 @@ pub fn matmul_transb(c: &mut Tensor<f32>, beta: f32, a: &Tensor<f32>, b: &Tensor
     let mid=a.shape()[1];
     let c_data=unsafe { c.data_mut() };
     let mut offset=0;
+    
     for i in 0..shape[0]  {
         let row=&a.data()[i*mid..(i+1)*mid];
         for j in 0..shape[1] {
@@ -132,6 +129,44 @@ pub fn matmul_transb(c: &mut Tensor<f32>, beta: f32, a: &Tensor<f32>, b: &Tensor
             offset+=1;
         }
     }
+}
+// 向量乘法
+// t判断是否需要转置,alpha,参数暂未使用
+pub fn vec_multi(c: &mut Tensor<f32>, a: &Tensor<f32>, b: &Tensor<f32>, alpha: f32,t:bool) {
+    // 判断c，长度是否大于二
+    assert!(c.shape().len()>2,"vec_multi of dimensions must be at least 2");
+    // a 重要，用于切分数据
+    assert!(a.shape().len()==2,"vec_multi of dimensions must be 2");
+    assert!(b.shape().len()==2,"vec_multi of dimensions must be 2");
+    let shape=c.shape();
+    // 获取矩阵的行列数
+    let (row, column) = (shape[shape.len() - 2], shape[shape.len() - 1]);
+    // 获取数据分组长度
+    let groups_len=shape[..shape.len() - 2].iter().product::<usize>();
+    let data=unsafe { c.data_mut() };
+    let  mut c_offset=0;
+    if t{
+         // 确认a，b需要的对应关系,默认a的长度大于b的长度
+        let nums_len=a.shape()[1]/b.shape()[1];
+        // 获取进行计算的向量长度
+        let vec_len=a.shape()[1]/groups_len;
+        for i in 0..row{
+            let a_date=&a.data()[i*a.shape()[1]..(i+1)*a.shape()[1]];
+            for j in 0..column {
+                let b_date=&b.data()[j*b.shape()[1]..(j+1)*b.shape()[1]];
+                // 经向量乘法
+               (0..groups_len).into_iter().for_each(|x|{
+                    a_date[x..(x+1)*vec_len].iter().
+                    zip(b_date[(x/nums_len)*vec_len..(1+(x/nums_len))*vec_len].iter())
+                    .for_each(|(da,db)|{
+                        data[c_offset]+=da*db;
+                    });
+                    c_offset+=1;
+                });
+            }
+        }
+    }
+    print!("{}",data[1]);
 }
 
 // Dot product of two tensors (treated as vectors)

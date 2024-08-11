@@ -5,7 +5,7 @@ use std::vec;
 
 use crate::config::LlamaConfigJson;
 use crate::kvcache::KVCache;
-use crate::operators::{self as OP, masked_softmax, matmul_transb, rms_norm, silu};
+use crate::operators::{self as OP, masked_softmax, matmul_transb, rms_norm, silu, vec_multi};
 use crate::params::LLamaParams;
 use crate::tensor::Tensor;
 use safetensors::{tensor, SafeTensors};
@@ -117,13 +117,16 @@ impl Llama<f32> {
             let full_v = &mut cache.v_cache(layer, 0); // (total_seq, n_kv_h * dqkv)
             // self_attention
             {
-                // 逐个计算词，在不同头的得分
-                // score = Q @ K.T / sqrt(dim) 
-                // 这里需要手动
-                matmul_transb(&mut att_scores, 0., q, full_k, 1.);
                 
+                // score = Q @ K.T / sqrt(dim) 
+                q.reshape(&vec![seq_len, self.n_q_h*self.dqkv]);
+                // matmul_transb(&mut att_scores, 0., q, full_k, 1.);
+                vec_multi(&mut att_scores,q, full_k,1., true);
                 masked_softmax(&mut att_scores);
-                matmul_transb(&mut residual, 1., &hidden_states, &self.params.wo[layer], 1.)
+                // x = attn @ V
+                // x shape 6*128, 
+                // masked_softmax(&hidden_states,0 ,&att_scores,)
+                matmul_transb(&mut hidden_states, 1., &att_scores, &self.params.wo[layer], 1.)
             }
             // todo!("down_proj matmul and add residual");
             // todo!("mlp(...)");
