@@ -29,18 +29,17 @@ impl LLamaParams<f32> {
         safetensor.names().iter().for_each(|name| {
             println!("{}", name);
         });
-        let get_tensor= |name: &str| { 
-            match safetensor.tensor(name)  {
+        let get_tensor = |name: &str| {
+            match safetensor.tensor(name) {
                 Ok(data) => {
-                    let p:usize=data.shape().iter().product();
+                    let p: usize = data.shape().iter().product();
                     // 获取引用，只目前只转换成f32类型
-                   let new_data=unsafe { slice::from_raw_parts(data.data().as_ptr() as *const f32, p)};
-                   // 生成新对象
+                    let new_data =
+                        unsafe { slice::from_raw_parts(data.data().as_ptr() as *const f32, p) };
+                    // 生成新对象
                     Tensor::new(Vec::from(new_data), &data.shape().to_vec())
-                } ,
-                Err(err) => {
-                Tensor::default(&Vec::new())
-                },
+                }
+                Err(err) => Tensor::default(&Vec::new()),
             }
         };
         Self {
