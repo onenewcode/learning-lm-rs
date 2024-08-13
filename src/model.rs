@@ -133,7 +133,7 @@ impl Llama<f32> {
                 // x = attn @ V
                 // 这里需要用到权重乘法，即上一步得出的是权重，接下来每一个权重对应的V向量
                 // vec_multi(&mut hidden_states, att_scores, &full_k, 1., false);
-                vec_multi_wight(&mut hidden_states, &att_scores, &full_k);
+                vec_multi_wight(&mut hidden_states, &att_scores, &full_v);
                 // x shape 6*128,
                 matmul_transb(
                     &mut residual,
@@ -146,6 +146,17 @@ impl Llama<f32> {
 
             // todo!("down_proj matmul and add residual");
             // todo!("mlp(...)");
+            mlp(
+                &mut residual,
+                &mut hidden_states,
+                &mut gate_buf,
+                &mut up_buf,
+                &self.params.w_up[layer],
+                &self.params.w_down[layer],
+                &self.params.w_gate[layer],
+                &self.params.rms_ffn_w[layer],
+                self.eps,
+            );
         }
 
         // No matter what seq_len, the output is always a 1D vector of length vocab,
@@ -178,7 +189,12 @@ impl Llama<f32> {
         let mut cache = self.new_cache();
         let input = Tensor::<u32>::new(Vec::from(token_ids), &vec![token_ids.len()]);
         for _ in 0..max_len {
-            let tmp = self.forward(&input, &mut cache);
+            result.push(OP::random_sample(
+                &self.forward(&input, &mut cache),
+                top_p,
+                top_k,
+                temperature,
+            ));
         }
 
         result
@@ -214,27 +230,8 @@ fn mlp(
     matmul_transb(gate, 0., hidden_states, w_gate, 1.0);
     matmul_transb(up, 0., hidden_states, w_up, 1.0);
     //  hidden = gate * sigmoid(gate) * up ## silu
-    let mut tmp_data = vec![0.; gate.shape().iter().product()];
-    {
-        // todo!
-        let (gate_data, up_data) = (gate.data(), up.data());
-        // 这里形状改变了！！变成4*3
-        for i in 0..tmp_data.len() {
-            tmp_data[i] = gate_data[i] * up_data[i] / (1.0 + (-gate_data[i]).exp());
-        }
-    }
-    // 4*3
-    let tmp_hidden = Tensor::new(tmp_data, gate.shape());
-    matmul_transb(hidden_states, 0., &tmp_hidden, w_down, 1.0);
-    unsafe {
-        residual
-            .data_mut()
-            .iter_mut()
-            .zip(hidden_states.data().iter())
-            .for_each(|(rd, hd)| {
-                *rd += hd;
-            });
-    };
+    silu(up, &gate);
+    matmul_transb(residual, 1., &up, w_down, 1.);
 }
 
 #[test]
