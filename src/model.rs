@@ -188,15 +188,33 @@ impl Llama<f32> {
         let mut result = Vec::<u32>::new();
         let mut cache = self.new_cache();
         let input = Tensor::<u32>::new(Vec::from(token_ids), &vec![token_ids.len()]);
-        for _ in 0..max_len {
-            result.push(OP::random_sample(
-                &self.forward(&input, &mut cache),
+        // 推理用户输入的信息
+        let mut tmp=Tensor::<u32>::new(vec![OP::random_sample(
+            &self.forward(&input, &mut cache),
+            top_p,
+            top_k,
+            temperature,
+        )],&vec![1]) ;
+        // 获取临时数据
+  
+        result.push(tmp.data()[0]);
+        for _ in 0..max_len{
+            // 更新最新推理的数据
+            let tt=OP::random_sample(
+                &self.forward(&tmp, &mut cache),
                 top_p,
                 top_k,
                 temperature,
-            ));
+            );
+            // 检查是否为<|end_story|>
+            if tt==2 {
+                break;
+            }
+            result.push(tt);
+            unsafe {
+                tmp.data_mut()[0]=tt;
+            }
         }
-
         result
     }
 }
