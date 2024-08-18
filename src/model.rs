@@ -61,8 +61,7 @@ impl Llama<f32> {
     // 推理单元重复使用
     pub fn forward(&self, input: &Tensor<u32>, cache: &mut KVCache<f32>) -> Tensor<f32> {
         // 输入文本的长度
-        let seq_len = input.size(); // 默认解码长度为6
-                                    // 已经处理过的文本的长度
+        let seq_len = input.size(); 
         let past_seq_len = cache.len();
         // 更新已经处理过的文本的长度
         cache.increment(seq_len);
@@ -181,11 +180,9 @@ impl Llama<f32> {
         &self,
         kvcache: &mut KVCache<f32>, //kv缓存
         token_ids: &[u32],
-        max_len: usize,
         top_p: f32,
         top_k: u32,
         temperature: f32,
-        end: u32, // 结束符编码
     ) -> Vec<u32> {
         let mut result = Vec::<u32>::new();
         let input = Tensor::<u32>::new(Vec::from(token_ids), &vec![token_ids.len()]);
@@ -199,19 +196,18 @@ impl Llama<f32> {
         // 获取临时数据
   
         result.push(tmp.data()[0]);
-        for _ in 0..max_len{
+        for _ in 0..self.max_seq_len-input.data().len() {
             // 更新最新推理的数据
             let tt=OP::random_sample(
-                &self.forward(&input,kvcache),
+                &self.forward(&tmp,kvcache),
                 top_p,
                 top_k,
                 temperature,
             );
-            // 检查是否为<|end_story|>
-            if tt==end {
+            result.push(tt);
+            if tt==self.eos_token_id {
                 break;
             }
-            result.push(tt);
             unsafe {
                 tmp.data_mut()[0]=tt;
             }

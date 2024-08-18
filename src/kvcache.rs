@@ -36,7 +36,7 @@ impl<T: Default + Copy> KVCache<T> {
     pub fn increment(&mut self, seq_len: usize) {
         self.length += seq_len;
     }
-    pub fn subtraction(&mut self,seq_len: usize) {
+    pub fn subtraction(&mut self, seq_len: usize) {
         self.length -= seq_len;
     }
     pub fn len(&self) -> usize {
