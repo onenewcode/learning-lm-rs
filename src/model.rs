@@ -179,18 +179,19 @@ impl Llama<f32> {
 
     pub fn generate(
         &self,
+        kvcache: &mut KVCache<f32>, //kv缓存
         token_ids: &[u32],
         max_len: usize,
         top_p: f32,
         top_k: u32,
         temperature: f32,
+        end: u32, // 结束符编码
     ) -> Vec<u32> {
         let mut result = Vec::<u32>::new();
-        let mut cache = self.new_cache();
         let input = Tensor::<u32>::new(Vec::from(token_ids), &vec![token_ids.len()]);
         // 推理用户输入的信息
         let mut tmp=Tensor::<u32>::new(vec![OP::random_sample(
-            &self.forward(&input, &mut cache),
+            &self.forward(&input, kvcache),
             top_p,
             top_k,
             temperature,
@@ -201,13 +202,13 @@ impl Llama<f32> {
         for _ in 0..max_len{
             // 更新最新推理的数据
             let tt=OP::random_sample(
-                &self.forward(&tmp, &mut cache),
+                &self.forward(&input,kvcache),
                 top_p,
                 top_k,
                 temperature,
             );
             // 检查是否为<|end_story|>
-            if tt==2 {
+            if tt==end {
                 break;
             }
             result.push(tt);
