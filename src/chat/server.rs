@@ -21,7 +21,8 @@ pub  fn cmd_server(c:Chat){
                 break;
             }
             ">rollback"=>{
-                c.chat_rollback();
+                let v=c.chat_rollback();
+                print!("{:?}",c.decode(&v));
             }
             _ => {
                 let v=c.start_generate(input.trim());

@@ -196,9 +196,9 @@ impl Llama<f32> {
         // 获取临时数据
   
         result.push(tmp.data()[0]);
-        for _ in 0..self.max_seq_len-input.data().len() {
-            // 更新最新推理的数据
-            let tt=OP::random_sample(
+        while kvcache.len() < self.max_seq_len {
+               // 更新最新推理的数据
+               let tt=OP::random_sample(
                 &self.forward(&tmp,kvcache),
                 top_p,
                 top_k,

@@ -48,6 +48,6 @@ impl Cache {
        self.kv_cache.reset(*last-1);
        // 清空info不需要的中的元素
        self.info.truncate(*last);
-       self.info.pop().unwrap()
+       *self.info.last().unwrap()
     }
 }
