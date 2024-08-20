@@ -20,13 +20,30 @@ impl  Chat  {
         // 如果有对话历史，加载以前的对话
         Chat { id, model:model.clone(), cache: cache,tokenizer: tokenizer}
     }
-   pub  fn chat_generate(&self,input:&str)->String{
+   pub  fn start_generate(&self,input:&str)->String{
         // 判断是否为空
         let binding = self.tokenizer.encode( format!("{}{}", RENDER, input).as_str(), true).unwrap();
         let input_ids = binding.get_ids();
+        // self.tokenizer.decode(&self.generate(input_ids), true).unwrap()
         let (top_p, top_k, temperature) = (0.9, 4, 1.);
         let mut kv=self.cache.lock().unwrap();
+        // 添加输入信息，输入步长
+        // kv.append_info(input);
        let v=self.model.generate(kv.get_mut_kvcache(),input_ids,top_p,top_k,temperature);
        self.tokenizer.decode(&v, true).unwrap()
+    }
+    fn generate(&self,input:&[u32])->Vec<u32>{
+        let (top_p, top_k, temperature) = (0.9, 4, 1.);
+        let mut kv=self.cache.lock().unwrap();
+        // 添加输入信息，输入步长
+        // kv.append_info(input);
+       let v=self.model.generate(kv.get_mut_kvcache(),input,top_p,top_k,temperature);
+       v
+    }
+    pub  fn chat_rollback(&self)->Vec<u32>{
+        let mut kv=self.cache.lock().unwrap();
+        let input=kv.rollback();
+        drop(kv);
+        self.generate(&[input])
     }
 }
