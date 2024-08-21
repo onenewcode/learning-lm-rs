@@ -1,12 +1,17 @@
-use std::{io::{self, BufRead, Write}, sync::Arc};
+use std::{io::{self, BufRead, Write}, sync::{Arc, Mutex}};
 
+use crate::{cache::{Cache, CACHE_MANGER}, chat::chat::Chat, MY_LLAMA};
 
-use super::chat::Chat;
-
-
-pub  fn cmd_server(c:Chat){
+pub  fn cmd_server(){
     let stdin = io::stdin();
     let mut handle = stdin.lock();
+    // 限制作用域
+    {
+        let c=unsafe { CACHE_MANGER.get_mut().unwrap() };
+        c.insert("1".to_owned(), Arc::new(Mutex::new(Cache::new(MY_LLAMA.get().unwrap().new_cache()))));
+        
+    }
+
     //  创建一个可安全共享的引用
     loop {
         print!("请输入推理文本 (输入 'exit' 退出程序): ");
@@ -21,10 +26,11 @@ pub  fn cmd_server(c:Chat){
                 break;
             }
             ">rollback"=>{
-                let v=c.chat_rollback();
-                print!("{:?}",c.decode(&v));
+                // let v=c.chat_rollback();
+                // print!("{:?}",c.decode(&v));
             }
             _ => {
+                let c=Chat::new_chat("1".to_owned(), unsafe { CACHE_MANGER.get().unwrap().get("1").unwrap().clone() });
                 let v=c.start_generate(input.trim());
                 print!("{:?}",v);
             }

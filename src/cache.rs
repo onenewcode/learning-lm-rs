@@ -2,7 +2,7 @@ use std::{cell::RefCell, collections::HashMap, sync::{Arc, Mutex, OnceLock}, vec
 
 use crate::kvcache::KVCache;
 
-static CACHE_MANGER: OnceLock<CManger> = OnceLock::new();
+pub(crate) static mut CACHE_MANGER: OnceLock<CManger> = OnceLock::new();
 type CManger=HashMap<String,Arc<Mutex<Cache>>>;
 pub struct Cache{
     kv_cache:KVCache<f32>,

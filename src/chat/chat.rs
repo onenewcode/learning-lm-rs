@@ -1,12 +1,12 @@
 use std::sync::{Arc, Mutex};
 use tokenizers::Tokenizer;
-use crate::{cache::Cache, model::Llama, operators as OP, tensor::Tensor};
+use crate::{cache::Cache, model::Llama, operators as OP, tensor::Tensor, MY_LLAMA, MY_TOKENIZER};
 // 固定模板
 const RENDER: &str="<|im_start|>";
 const ROLE:&str="system\n";
 pub struct Chat{
     // 对话id
-    id:u32,
+    id:String,
     // 管理对话历史 todo
     // 模型参数
     model:Arc<Llama<f32>>,
@@ -16,10 +16,13 @@ pub struct Chat{
     // 最大长度
 }
 impl  Chat  {
-    pub fn new(id:u32,model:Arc<Llama<f32>>,cache:Arc<Mutex<Cache>>,tokenizer:Arc<Tokenizer>)->Chat {
+    pub fn new(id:String,model:Arc<Llama<f32>>,cache:Arc<Mutex<Cache>>,tokenizer:Arc<Tokenizer>)->Chat {
         // 判断是否加载以前的对话 todo
         // 如果有对话历史，加载以前的对话
         Chat { id, model:model.clone(), cache: cache,tokenizer: tokenizer}
+    }
+    pub fn new_chat(id:String,cache:Arc<Mutex<Cache>>)->Self{
+        Chat { id, model:MY_LLAMA.get().unwrap().clone(), cache: cache,tokenizer: MY_TOKENIZER.get().unwrap().clone()}
     }
    pub  fn start_generate(&self,input:&str)->String{
         // 判断是否为空

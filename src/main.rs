@@ -1,4 +1,4 @@
-use std::{path::PathBuf, sync::{Arc, Mutex}};
+use std::{collections::HashMap, path::PathBuf, sync::{Arc, Mutex, OnceLock}};
 mod chat;
 mod kvcache;
 mod model;
@@ -7,25 +7,25 @@ mod params;
 mod config;
 mod tensor;
 mod cache;
+use cache::CACHE_MANGER;
 use clap::{Args, Parser, Subcommand};
+use model::Llama;
 use tokenizers::Tokenizer;
-
-
+static MY_LLAMA: OnceLock<Arc<Llama<f32>>> = OnceLock::new();
+static MY_TOKENIZER: OnceLock<Arc<Tokenizer>> = OnceLock::new();
  fn main() {
     // 加载模型
     let project_dir = env!("CARGO_MANIFEST_DIR");
     let model_dir = PathBuf::from(project_dir).join("models").join("chat");
-    let llama =Arc::new(model::Llama::<f32>::from_safetensors(&model_dir));
-    let tokenizer = Arc::new(Tokenizer::from_file(model_dir.join("tokenizer.json")).unwrap());
+    // 初始化一些全局变量
+    let _ = MY_LLAMA.set(Arc::new(model::Llama::<f32>::from_safetensors(&model_dir)));
+    let _ = MY_TOKENIZER.set(Arc::new(Tokenizer::from_file(model_dir.join("tokenizer.json")).unwrap()));
+    let _ =  unsafe { CACHE_MANGER.set(HashMap::new()) };
     match Cli::parse().command {
         Commands::Chat(a) => {
             use chat::server::cmd_server;
            if a.mode == "cmd" {
-            let cache= Arc::new(Mutex::new(cache::Cache::new(llama.new_cache())));
-            // 生成对话模型
-            let chat = chat::chat::Chat::new(a.session_id, llama, cache,tokenizer);
-            cmd_server(chat);
-            //   tokio::spawn(cmd_server());
+            cmd_server();
            }
         }
     }
