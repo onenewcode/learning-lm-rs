@@ -61,7 +61,7 @@ impl Llama<f32> {
     // 推理单元重复使用
     pub fn forward(&self, input: &Tensor<u32>, cache: &mut KVCache<f32>) -> Tensor<f32> {
         // 输入文本的长度
-        let seq_len = input.size(); 
+        let seq_len = input.size();
         let past_seq_len = cache.len();
         // 更新已经处理过的文本的长度
         cache.increment(seq_len);
@@ -187,29 +187,27 @@ impl Llama<f32> {
         let mut result = Vec::<u32>::new();
         let input = Tensor::<u32>::new(Vec::from(token_ids), &vec![token_ids.len()]);
         // 推理用户输入的信息
-        let mut tmp=Tensor::<u32>::new(vec![OP::random_sample(
-            &self.forward(&input, kvcache),
-            top_p,
-            top_k,
-            temperature,
-        )],&vec![1]) ;
-        // 获取临时数据
-  
-        result.push(tmp.data()[0]);
-        while kvcache.len() < self.max_seq_len {
-               // 更新最新推理的数据
-               let tt=OP::random_sample(
-                &self.forward(&tmp,kvcache),
+        let mut tmp = Tensor::<u32>::new(
+            vec![OP::random_sample(
+                &self.forward(&input, kvcache),
                 top_p,
                 top_k,
                 temperature,
-            );
+            )],
+            &vec![1],
+        );
+        // 获取临时数据
+
+        result.push(tmp.data()[0]);
+        while kvcache.len() < self.max_seq_len {
+            // 更新最新推理的数据
+            let tt = OP::random_sample(&self.forward(&tmp, kvcache), top_p, top_k, temperature);
             result.push(tt);
-            if tt==self.eos_token_id {
+            if tt == self.eos_token_id {
                 break;
             }
             unsafe {
-                tmp.data_mut()[0]=tt;
+                tmp.data_mut()[0] = tt;
             }
         }
         result
