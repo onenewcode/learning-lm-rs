@@ -1,11 +1,9 @@
 use std::{
-    cell::RefCell,
     collections::HashMap,
     sync::{Arc, Mutex, OnceLock},
-    vec,
 };
 
-use crate::kvcache::KVCache;
+use crate::{kvcache::KVCache, MY_LLAMA};
 
 pub(crate) static mut CACHE_MANGER: OnceLock<CManger> = OnceLock::new();
 type CManger = HashMap<String, Arc<Mutex<Cache>>>;
@@ -16,6 +14,7 @@ pub struct Cache {
     // 用于记录推理信息
     info: Vec<u32>,
 }
+
 impl Cache {
     pub fn get_mut_kvcache(&mut self) -> &mut KVCache<f32> {
         &mut self.kv_cache
@@ -26,6 +25,9 @@ impl Cache {
             step: Vec::new(),
             info: Vec::new(),
         }
+    }
+    pub fn new_cmanger() -> Arc<Mutex<Self>> {
+        Arc::new(Mutex::new(Cache::new(MY_LLAMA.get().unwrap().new_cache())))
     }
     // 用于回滚，同时回滚kvc
     pub fn pop_step(&mut self) {

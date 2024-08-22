@@ -1,4 +1,4 @@
-use std::{borrow::BorrowMut, f32::consts::SQRT_2, vec};
+use std::vec;
 
 use crate::tensor::Tensor;
 /// 获取编码后，每个词代表的向量，组成一个矩阵

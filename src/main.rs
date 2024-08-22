@@ -1,7 +1,7 @@
+#![feature(once_cell_get_mut)]
 use std::{
-    collections::HashMap,
     path::PathBuf,
-    sync::{Arc, Mutex, OnceLock},
+    sync::{Arc, OnceLock},
 };
 mod cache;
 mod chat;
@@ -11,7 +11,6 @@ mod model;
 mod operators;
 mod params;
 mod tensor;
-use cache::CACHE_MANGER;
 use clap::{Args, Parser, Subcommand};
 use model::Llama;
 use tokenizers::Tokenizer;
@@ -26,7 +25,6 @@ fn main() {
     let _ = MY_TOKENIZER.set(Arc::new(
         Tokenizer::from_file(model_dir.join("tokenizer.json")).unwrap(),
     ));
-    let _ = unsafe { CACHE_MANGER.set(HashMap::new()) };
     match Cli::parse().command {
         Commands::Chat(a) => {
             use chat::server::cmd_server;

@@ -1,5 +1,3 @@
-use std::borrow::BorrowMut;
-use std::cell::RefCell;
 use std::fs::File;
 use std::vec;
 
@@ -10,7 +8,7 @@ use crate::operators::{
 };
 use crate::params::LLamaParams;
 use crate::tensor::Tensor;
-use safetensors::{tensor, SafeTensors};
+use safetensors::SafeTensors;
 use std::path::Path;
 pub struct Llama<T> {
     vocab: usize,    // vocab size

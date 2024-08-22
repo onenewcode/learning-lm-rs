@@ -1,9 +1,7 @@
-use core::slice;
-use std::alloc::LayoutErr;
-
 use crate::config::LlamaConfigJson;
 use crate::tensor::Tensor;
-use safetensors::{SafeTensors, View};
+use core::slice;
+use safetensors::SafeTensors;
 pub struct LLamaParams<T> {
     // token_id to embedding lookup table
     pub embedding_table: Tensor<T>, // (vocab_size, dim)

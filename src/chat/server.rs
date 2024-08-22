@@ -1,13 +1,12 @@
 use std::{
+    collections::HashMap,
     io::{self, BufRead, Write},
     process,
-    sync::{Arc, Mutex},
 };
 
 use crate::{
-    cache::{Cache, CACHE_MANGER},
+    cache::{self, Cache, CACHE_MANGER},
     chat::chat::Chat,
-    MY_LLAMA,
 };
 enum ChatMessage {
     Chat,
@@ -19,18 +18,15 @@ enum ChatMessage {
 pub fn cmd_server() {
     let stdin = io::stdin();
     let mut handle = stdin.lock();
+
+    // 初始化默认Chat
+    let mut chat = Chat::new_chat("1".to_owned(), cache::Cache::new_cmanger());
     // 限制作用域
     {
-        let c = unsafe { CACHE_MANGER.get_mut().unwrap() };
-        c.insert(
-            "1".to_owned(),
-            Arc::new(Mutex::new(Cache::new(MY_LLAMA.get().unwrap().new_cache()))),
-        );
+        // 初始化
+        let c = unsafe { CACHE_MANGER.get_mut_or_init(|| HashMap::new()) };
+        c.insert(chat.chat_id(), chat.cache());
     }
-    // 初始化默认Chat
-    let c = Chat::new_chat("1".to_owned(), unsafe {
-        CACHE_MANGER.get().unwrap().get("1").unwrap().clone()
-    });
     //  创建一个可安全共享的引用
     loop {
         print!("请输入推理文本 (输入 '>exit' 退出程序): ");
@@ -40,16 +36,31 @@ pub fn cmd_server() {
         handle.read_line(&mut input).expect("读取失败");
         match cmd_check(&input) {
             ChatMessage::Chat => {
-                let result = c.start_generate(&input.trim());
+                let result = chat.start_generate(&input.trim());
                 println!("{}", result);
             }
             ChatMessage::Rollback => {
-                let result = c.chat_rollback();
-                println!("{}", c.decode(&result));
+                let result = chat.chat_rollback();
+                println!("{}", chat.decode(&result));
             }
             ChatMessage::Switch(id) => {
                 println!("{}", id);
-                // if unsafe { CACHE_MANGER.get().unwrap().get(&id).is_some}
+                unsafe {
+                    match CACHE_MANGER.get().unwrap().get(&id) {
+                        // 能够查询到缓存
+                        Some(ch) => {
+                            chat = Chat::new_chat(id, ch.clone());
+                        }
+                        None => {
+                            let tmp_cache = Cache::new_cmanger();
+                            CACHE_MANGER
+                                .get_mut()
+                                .unwrap()
+                                .insert(id.clone(), tmp_cache.clone());
+                            chat = Chat::new_chat(id, tmp_cache);
+                        }
+                    }
+                };
             }
             ChatMessage::Exit => {
                 process::exit(0);
@@ -73,7 +84,12 @@ fn cmd_check(info: &str) -> ChatMessage {
     if let Some(index) = info.find(' ') {
         match &info[1..index] {
             "switch" => {
-                return ChatMessage::Switch(info[index + 1..].to_owned());
+                // 去除结尾的无用字符
+                return ChatMessage::Switch(
+                    info[index + 1..]
+                        .trim_end_matches(['\n', '\r', '\t'])
+                        .to_string(),
+                );
             }
             _ => {
                 return ChatMessage::Error("未知错误，无法推理".to_owned());

@@ -1,4 +1,4 @@
-use crate::{cache::Cache, model::Llama, operators as OP, tensor::Tensor, MY_LLAMA, MY_TOKENIZER};
+use crate::{cache::Cache, model::Llama, MY_LLAMA, MY_TOKENIZER};
 use std::sync::{Arc, Mutex};
 use tokenizers::Tokenizer;
 // 固定模板
@@ -73,5 +73,11 @@ impl Chat {
     }
     pub fn decode(&self, input: &[u32]) -> String {
         self.tokenizer.decode(input, true).unwrap()
+    }
+    pub fn cache(&self) -> Arc<Mutex<Cache>> {
+        self.cache.clone()
+    }
+    pub fn chat_id(&self) -> String {
+        self.id.clone()
     }
 }
