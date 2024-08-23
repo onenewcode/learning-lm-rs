@@ -4,7 +4,7 @@ use tokenizers::Tokenizer;
 // 固定模板
 const RENDER: &str = "<|im_start|>";
 const ROLE: &str = "system <s>";
-pub struct Chat {
+pub struct Chat<C:Default + Copy> {
     // 对话id
     id: String,
     // 管理对话历史 todo
@@ -12,16 +12,16 @@ pub struct Chat {
     model: Arc<Llama<f32>>,
     tokenizer: Arc<Tokenizer>,
     // 缓存 RefCell
-    cache: Arc<Mutex<Cache>>,
+    cache: Arc<Mutex<Cache<C>>>,
     // 最大长度
 }
-impl Chat {
+impl Chat<f32> {
     pub fn new(
         id: String,
         model: Arc<Llama<f32>>,
-        cache: Arc<Mutex<Cache>>,
+        cache: Arc<Mutex<Cache<f32>>>,
         tokenizer: Arc<Tokenizer>,
-    ) -> Chat {
+    ) -> Chat<f32> {
         // 判断是否加载以前的对话 todo
         // 如果有对话历史，加载以前的对话
         Chat {
@@ -31,7 +31,7 @@ impl Chat {
             tokenizer: tokenizer,
         }
     }
-    pub fn new_chat(id: String, cache: Arc<Mutex<Cache>>) -> Self {
+    pub fn new_chat(id: String, cache: Arc<Mutex<Cache<f32>>>) -> Self {
         Chat {
             id,
             model: MY_LLAMA.get().unwrap().clone(),
@@ -74,7 +74,7 @@ impl Chat {
     pub fn decode(&self, input: &[u32]) -> String {
         self.tokenizer.decode(input, true).unwrap()
     }
-    pub fn cache(&self) -> Arc<Mutex<Cache>> {
+    pub fn cache(&self) -> Arc<Mutex<Cache<f32>>> {
         self.cache.clone()
     }
     pub fn chat_id(&self) -> String {

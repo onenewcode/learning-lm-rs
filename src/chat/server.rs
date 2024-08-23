@@ -3,7 +3,6 @@ use std::{
     io::{self, BufRead, Write},
     process,
 };
-
 use crate::{
     cache::{self, Cache, CACHE_MANGER},
     chat::chat::Chat,
@@ -15,7 +14,7 @@ enum ChatMessage {
     Exit,
     Error(String),
 }
-pub fn cmd_server() {
+pub async fn cmd_server() {
     let stdin = io::stdin();
     let mut handle = stdin.lock();
 

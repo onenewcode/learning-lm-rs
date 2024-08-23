@@ -19,7 +19,8 @@ static MY_TOKENIZER: OnceLock<Arc<Tokenizer>> = OnceLock::new();
 trait ShutDownCallback {
     fn shut_down_callback(&self);
 }
-fn main() {
+#[tokio::main]
+async fn main() {
     // 加载模型
     let project_dir = env!("CARGO_MANIFEST_DIR");
     let model_dir = PathBuf::from(project_dir).join("models").join("chat");
@@ -32,7 +33,8 @@ fn main() {
         Commands::Chat(a) => {
             use chat::server::cmd_server;
             if a.mode == "cmd" {
-                cmd_server();
+                let handel=tokio::spawn(cmd_server());
+                let _ = handel.await;
             }
         }
     }
