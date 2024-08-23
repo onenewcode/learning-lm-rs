@@ -16,6 +16,9 @@ use model::Llama;
 use tokenizers::Tokenizer;
 static MY_LLAMA: OnceLock<Arc<Llama<f32>>> = OnceLock::new();
 static MY_TOKENIZER: OnceLock<Arc<Tokenizer>> = OnceLock::new();
+trait ShutDownCallback {
+    fn shut_down_callback(&self);
+}
 fn main() {
     // 加载模型
     let project_dir = env!("CARGO_MANIFEST_DIR");

@@ -2,11 +2,23 @@ use std::{
     collections::HashMap,
     sync::{Arc, Mutex, OnceLock},
 };
-
-use crate::{kvcache::KVCache, MY_LLAMA};
+use crate::{kvcache::KVCache, ShutDownCallback, MY_LLAMA};
 
 pub(crate) static mut CACHE_MANGER: OnceLock<CManger> = OnceLock::new();
 type CManger = HashMap<String, Arc<Mutex<Cache>>>;
+impl ShutDownCallback for CManger {
+    // todo 持久化
+    fn shut_down_callback(&self) {
+        // self.iter().for_each(|(i, cache)| {
+        //     // 序列化Person到JSON字符串
+        //     let json_str = serde_json::to_string_pretty(cache)?;
+
+        //     // 将序列化后的JSON字符串写入文件
+        //     let mut file = File::create("person.json")?;
+        //     file.write_all(json_str.as_bytes())?;
+        // });
+    }
+}
 pub struct Cache {
     kv_cache: KVCache<f32>,
     // 用于记录推理步长
