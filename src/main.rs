@@ -33,8 +33,7 @@ async fn main() {
         Commands::Chat(a) => {
             use chat::server::cmd_server;
             if a.mode == "cmd" {
-                let handel=tokio::spawn(cmd_server());
-                let _ = handel.await;
+                cmd_server().await;
             }
         }
     }
@@ -61,4 +60,13 @@ struct ChatArgs {
     /// Model directory.
     #[clap(short, long, default_value = "cmd")]
     mode: String,
+}
+#[macro_export]
+macro_rules! print_now {
+    ($($arg:tt)*) => {{
+        use std::io::Write;
+
+        print!($($arg)*);
+        std::io::stdout().flush().unwrap();
+    }};
 }

@@ -1,11 +1,15 @@
-use std::{
-    collections::HashMap,
-    io::{self, BufRead, Write},
-    process,
-};
 use crate::{
     cache::{self, Cache, CACHE_MANGER},
     chat::chat::Chat,
+    print_now,
+};
+use std::{
+    borrow::BorrowMut,
+    collections::HashMap,
+    future::IntoFuture,
+    io::{self, BufRead, Write},
+    process,
+    sync::Arc,
 };
 enum ChatMessage {
     Chat,
@@ -17,9 +21,8 @@ enum ChatMessage {
 pub async fn cmd_server() {
     let stdin = io::stdin();
     let mut handle = stdin.lock();
-
     // 初始化默认Chat
-    let mut chat = Chat::new_chat("1".to_owned(), cache::Cache::new_cmanger());
+    let mut chat = Arc::new(Chat::new_chat("1".to_owned(), cache::Cache::new_cmanger()));
     // 限制作用域
     {
         // 初始化
@@ -35,12 +38,22 @@ pub async fn cmd_server() {
         handle.read_line(&mut input).expect("读取失败");
         match cmd_check(&input) {
             ChatMessage::Chat => {
-                let result = chat.start_generate(&input.trim());
-                println!("{}", result);
+                let mut r = chat.clone().start_generate(&input.trim());
+                loop {
+                    match r.recv().await {
+                        Some(v) => {
+                            print_now!("{} ", chat.decode(&[v]))
+                        }
+                        None => {
+                            println!();
+                            break;
+                        }
+                    }
+                }
             }
             ChatMessage::Rollback => {
-                let result = chat.chat_rollback();
-                println!("{}", chat.decode(&result));
+                // let result = chat.chat_rollback();
+                // println!("{}", chat.decode(&result));
             }
             ChatMessage::Switch(id) => {
                 println!("{}", id);
@@ -48,7 +61,7 @@ pub async fn cmd_server() {
                     match CACHE_MANGER.get().unwrap().get(&id) {
                         // 能够查询到缓存
                         Some(ch) => {
-                            chat = Chat::new_chat(id, ch.clone());
+                            chat = Arc::new(Chat::new_chat(id, ch.clone()));
                         }
                         None => {
                             let tmp_cache = Cache::new_cmanger();
@@ -56,7 +69,7 @@ pub async fn cmd_server() {
                                 .get_mut()
                                 .unwrap()
                                 .insert(id.clone(), tmp_cache.clone());
-                            chat = Chat::new_chat(id, tmp_cache);
+                            chat = Arc::new(Chat::new_chat(id, tmp_cache));
                         }
                     }
                 };
