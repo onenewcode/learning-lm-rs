@@ -1,12 +1,9 @@
 use crate::{
     cache::{self, Cache, CACHE_MANGER},
     chat::chat::Chat,
-    print_now,
 };
 use std::{
-    borrow::BorrowMut,
     collections::HashMap,
-    future::IntoFuture,
     io::{self, BufRead, Write},
     process,
     sync::Arc,
@@ -39,21 +36,11 @@ pub async fn cmd_server() {
         match cmd_check(&input) {
             ChatMessage::Chat => {
                 let mut r = chat.clone().start_generate(&input.trim());
-                loop {
-                    match r.recv().await {
-                        Some(v) => {
-                            print_now!("{} ", chat.decode(&[v]))
-                        }
-                        None => {
-                            println!();
-                            break;
-                        }
-                    }
-                }
+                chat.chat_output(&mut r).await;
             }
             ChatMessage::Rollback => {
-                // let result = chat.chat_rollback();
-                // println!("{}", chat.decode(&result));
+                let mut r = chat.clone().chat_rollback();
+                chat.chat_output(&mut r).await;
             }
             ChatMessage::Switch(id) => {
                 println!("{}", id);

@@ -1,13 +1,14 @@
 use crate::{cache::Cache, model::Llama, MY_LLAMA, MY_TOKENIZER};
-use std::{
-    borrow::BorrowMut,
-    sync::{Arc, Mutex},
-};
+use std::sync::{Arc, Mutex};
 use tokenizers::Tokenizer;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 // 固定模板
-const RENDER: &str = "<|im_start|>";
-const ROLE: &str = "system <s>";
+const RENDER: &str = "<|im_start|>system
+{system_message}<|im_end|>
+<|im_start|>user
+{user_message}<|im_end|>
+<|im_start|>";
+const ROLE: &str = "assistant <s>";
 pub struct Chat<C: Default + Copy> {
     // 对话id
     id: String,
@@ -67,7 +68,7 @@ impl Chat<f32> {
         model: Arc<Llama<f32>>,
         sender: UnboundedSender<u32>,
     ) {
-        let (top_p, top_k, temperature) = (0.9, 4, 1.);
+        let (top_p, top_k, temperature) = (0.7, 1, 1.);
         let mut kv = cache.lock().unwrap();
         // 添加输入信息，输入步长
         kv.append_info(input);
@@ -81,16 +82,30 @@ impl Chat<f32> {
         );
         kv.append_info(&v);
     }
-    // pub fn chat_rollback(&self) -> Vec<u32> {
-    //     let mut kv = self.cache.lock().unwrap();
-    //     let input = kv.rollback();
-    //     let (top_p, top_k, temperature) = (0.9, 1, 1.);
-    //     let v = self
-    //         .model
-    //         .generate(kv.get_mut_kvcache(), &[input], top_p, top_k, temperature);
-    //     kv.append_info(&v);
-    //     v
-    // }
+    pub fn chat_rollback(self: Arc<Self>) -> UnboundedReceiver<u32> {
+        let input = {
+            let mut kv = self.cache.lock().unwrap();
+            kv.rollback()
+        };
+        let (s, r) = unbounded_channel::<u32>();
+        tokio::task::spawn_blocking(move || {
+            Self::generate(&[input], self.cache.clone(), self.model.clone(), s);
+        });
+        r
+    }
+    pub  async fn chat_output(&self, r:&mut UnboundedReceiver<u32>){
+        loop {
+            match r.recv().await {
+                Some(v) => {
+                    crate::print_now!("{} ", self.decode(&[v]))
+                }
+                None => {
+                    println!();
+                    break;
+                }
+            }
+        }
+    }
     pub fn decode(&self, input: &[u32]) -> String {
         self.tokenizer.decode(input, true).unwrap()
     }
