@@ -1,4 +1,4 @@
-use crate::{cache::Cache, model::Llama, MY_LLAMA, MY_TOKENIZER};
+use crate::{cache::Cache, model::Llama, print_now, MY_LLAMA, MY_TOKENIZER};
 use std::sync::{Arc, Mutex};
 use tokenizers::Tokenizer;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
@@ -94,6 +94,7 @@ impl Chat<f32> {
         r
     }
     pub  async fn chat_output(&self, r:&mut UnboundedReceiver<u32>){
+        print_now!("chat id {}\n ",self.chat_id());
         loop {
             match r.recv().await {
                 Some(v) => {

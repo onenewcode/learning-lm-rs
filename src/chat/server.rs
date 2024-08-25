@@ -43,14 +43,15 @@ pub async fn cmd_server() {
                 chat.chat_output(&mut r).await;
             }
             ChatMessage::Switch(id) => {
-                println!("{}", id);
                 unsafe {
                     match CACHE_MANGER.get().unwrap().get(&id) {
                         // 能够查询到缓存
                         Some(ch) => {
+                            println!("查询到缓存，转换到chat {}", id);
                             chat = Arc::new(Chat::new_chat(id, ch.clone()));
                         }
                         None => {
+                            println!("未查询到缓存，新生成chat {}", id);
                             let tmp_cache = Cache::new_cmanger();
                             CACHE_MANGER
                                 .get_mut()
