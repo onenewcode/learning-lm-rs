@@ -1,8 +1,8 @@
+use crate::{kvcache::KVCache, ShutDownCallback, MY_LLAMA};
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex, OnceLock},
 };
-use crate::{kvcache::KVCache, ShutDownCallback, MY_LLAMA};
 
 pub(crate) static mut CACHE_MANGER: OnceLock<CManger> = OnceLock::new();
 type CManger = HashMap<String, Arc<Mutex<Cache<f32>>>>;
@@ -19,7 +19,7 @@ impl ShutDownCallback for CManger {
         // });
     }
 }
-pub struct  Cache<Storage: Default + Copy> {
+pub struct Cache<Storage: Default + Copy> {
     kv_cache: KVCache<Storage>,
     // 用于记录推理步长
     step: Vec<usize>,
@@ -27,7 +27,7 @@ pub struct  Cache<Storage: Default + Copy> {
     info: Vec<u32>,
 }
 
-impl <Storage: Default + Copy>Cache<Storage> {
+impl<Storage: Default + Copy> Cache<Storage> {
     pub fn get_mut_kvcache(&mut self) -> &mut KVCache<Storage> {
         &mut self.kv_cache
     }
@@ -74,11 +74,10 @@ impl <Storage: Default + Copy>Cache<Storage> {
 impl Cache<f32> {
     pub fn new_cmanger() -> Arc<Mutex<Self>> {
         // Arc::new(Mutex::new(Cache::new(MY_LLAMA.get().unwrap().new_cache())))
-        Arc::new(Mutex::new(
-            Self {
-                kv_cache: MY_LLAMA.get().unwrap().new_cache(),
-                step: Vec::new(),
-                info: Vec::new(),
-            }))
+        Arc::new(Mutex::new(Self {
+            kv_cache: MY_LLAMA.get().unwrap().new_cache(),
+            step: Vec::new(),
+            info: Vec::new(),
+        }))
     }
 }

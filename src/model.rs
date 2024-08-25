@@ -10,6 +10,7 @@ use crate::params::LLamaParams;
 use crate::tensor::Tensor;
 use safetensors::SafeTensors;
 use std::path::Path;
+use tokio::sync::mpsc::UnboundedSender;
 pub struct Llama<T> {
     vocab: usize,    // vocab size
     n_layers: usize, // number of layers
@@ -181,6 +182,7 @@ impl Llama<f32> {
         top_p: f32,
         top_k: u32,
         temperature: f32,
+        sender: UnboundedSender<u32>,
     ) -> Vec<u32> {
         let mut result = Vec::<u32>::new();
         let input = Tensor::<u32>::new(Vec::from(token_ids), &vec![token_ids.len()]);
@@ -197,17 +199,21 @@ impl Llama<f32> {
         // 获取临时数据
 
         result.push(tmp.data()[0]);
-        while kvcache.len() < self.max_seq_len {
+        while kvcache.len() < self.max_seq_len && tmp.data()[0] != self.eos_token_id {
+            match sender.send(tmp.data()[0]) {
+                Ok(_) => {}
+                Err(v) => {
+                    println!("{:?}", v);
+                }
+            }
             // 更新最新推理的数据
             let tt = OP::random_sample(&self.forward(&tmp, kvcache), top_p, top_k, temperature);
             result.push(tt);
-            if tt == self.eos_token_id {
-                break;
-            }
             unsafe {
                 tmp.data_mut()[0] = tt;
             }
         }
+        let _ = sender.clone();
         result
     }
 }

@@ -1,10 +1,14 @@
 use crate::{cache::Cache, model::Llama, MY_LLAMA, MY_TOKENIZER};
-use std::sync::{Arc, Mutex};
+use std::{
+    borrow::BorrowMut,
+    sync::{Arc, Mutex},
+};
 use tokenizers::Tokenizer;
+use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 // 固定模板
 const RENDER: &str = "<|im_start|>";
 const ROLE: &str = "system <s>";
-pub struct Chat<C:Default + Copy> {
+pub struct Chat<C: Default + Copy> {
     // 对话id
     id: String,
     // 管理对话历史 todo
@@ -39,38 +43,54 @@ impl Chat<f32> {
             tokenizer: MY_TOKENIZER.get().unwrap().clone(),
         }
     }
-    pub fn start_generate(&self, input: &str) -> String {
+    pub fn start_generate(self: Arc<Self>, input: &str) -> UnboundedReceiver<u32> {
         // 判断是否为空
         let binding = self
             .tokenizer
             .encode(format!("{}{}{}", RENDER, ROLE, input).as_str(), true)
             .unwrap();
-        let input_ids = binding.get_ids();
-        self.tokenizer
-            .decode(&self.generate(input_ids), true)
-            .unwrap()
+        let (s, r) = unbounded_channel::<u32>();
+        tokio::task::spawn_blocking(move || {
+            // &Vec::from(binding.get_ids())这里进行深拷贝
+            Self::generate(
+                &Vec::from(binding.get_ids()),
+                self.cache.clone(),
+                self.model.clone(),
+                s,
+            );
+        });
+        r
     }
-    fn generate(&self, input: &[u32]) -> Vec<u32> {
-        let (top_p, top_k, temperature) = (0.9, 1, 1.);
-        let mut kv = self.cache.lock().unwrap();
+    fn generate(
+        input: &[u32],
+        cache: Arc<Mutex<Cache<f32>>>,
+        model: Arc<Llama<f32>>,
+        sender: UnboundedSender<u32>,
+    ) {
+        let (top_p, top_k, temperature) = (0.9, 4, 1.);
+        let mut kv = cache.lock().unwrap();
         // 添加输入信息，输入步长
         kv.append_info(input);
-        let v = self
-            .model
-            .generate(kv.get_mut_kvcache(), input, top_p, top_k, temperature);
+        let v = model.generate(
+            kv.get_mut_kvcache(),
+            input,
+            top_p,
+            top_k,
+            temperature,
+            sender,
+        );
         kv.append_info(&v);
-        v
     }
-    pub fn chat_rollback(&self) -> Vec<u32> {
-        let mut kv = self.cache.lock().unwrap();
-        let input = kv.rollback();
-        let (top_p, top_k, temperature) = (0.9, 1, 1.);
-        let v = self
-            .model
-            .generate(kv.get_mut_kvcache(), &[input], top_p, top_k, temperature);
-        kv.append_info(&v);
-        v
-    }
+    // pub fn chat_rollback(&self) -> Vec<u32> {
+    //     let mut kv = self.cache.lock().unwrap();
+    //     let input = kv.rollback();
+    //     let (top_p, top_k, temperature) = (0.9, 1, 1.);
+    //     let v = self
+    //         .model
+    //         .generate(kv.get_mut_kvcache(), &[input], top_p, top_k, temperature);
+    //     kv.append_info(&v);
+    //     v
+    // }
     pub fn decode(&self, input: &[u32]) -> String {
         self.tokenizer.decode(input, true).unwrap()
     }
