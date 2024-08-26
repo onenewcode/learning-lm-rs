@@ -1,35 +1,58 @@
+from transformers import AutoModel, AutoTokenizer
 import torch
-import os
-from transformers import AutoModelForCausalLM, BitsAndBytesConfig
-# from bitsandbytes import 
+# excute from project directory.
+model_directory = "models/story"
 
-# quantization_config = QuantizationConfig(
-#     load_in_4bit=True,
-#     bnb_4bit_use_double_quant=True,
-#     bnb_4bit_quant_type="nf4",
-#     bnb_4bit_compute_dtype=torch.bfloat16
-# )
+model = AutoModel.from_pretrained(model_directory)
 
-# 模型路径
-model_id = './models/story/'
+print(model.config)
 
-# 模型加载，转换
-model = AutoModelForCausalLM.from_pretrained(
-    model_id, # 模型路径
-    local_files_only=True,# 仅从本地加载模型，不从网络下载。
-    torch_dtype=torch.float16, # 型权重的数据类型转换为 float16
-     quantization_config = BitsAndBytesConfig(
-        bnb_4bit_quant_type="nf4",
-        bnb_4bit_compute_dtype=torch.bfloat16
-    ),
-    # device_map='auto' # 自动分配设备
-)
+for name, param in model.named_parameters():
+    print(f"Name: {name}, Size: {param.size()}")
+
+tokenizer = AutoTokenizer.from_pretrained(model_directory)
+text = "Once upon a time"
+inputs = tokenizer(text, return_tensors="pt")
+outputs_dict = {}
+
+def hook_fn(layer_name):
+    def hook(module, input, output):
+        outputs_dict[layer_name] = {
+            "input": input,
+            "output": output
+        }
+    return hook
+
+    
+
+# 注册钩子
+for name, layer in model.named_modules():
+    layer_name = f"transformer_layer_{name}"
+    layer.register_forward_hook(hook_fn(layer_name))
+
+# 执行推理
+with torch.no_grad():
+    print(model(**inputs))
 
 
-output = "./soulteary/Chinese-Llama-2-7b-4bit"
-if not os.path.exists(output):
-    os.mkdir(output)
 
-model.save_pretrained(output)
-print("done")
+for layer_name, data in outputs_dict.items():
+    print(f"Layer: {layer_name}")
+    if isinstance(data['input'], tuple):
+        for t in data['input']:
+            if isinstance(t , torch.Tensor):
+                print(f"Input shape: {t.shape}")
+    else:
+        print(f"Input shape: {data['input'].shape}")
 
+    if isinstance(data['output'], tuple):
+        for t in data['output']:
+            if isinstance(t , torch.Tensor):
+                print(f"Output shape: {t.shape}")
+    elif isinstance(data['output'], torch.Tensor):
+        print(f"Output shape: {data['output'].shape}")
+    else:
+        print(f"Output type: {type(t)}")
+    print(f"Input: {data['input']}")
+    print(f"Output: {data['output']}")
+    print()

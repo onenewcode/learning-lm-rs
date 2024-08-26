@@ -1,9 +1,26 @@
-use std::{borrow::BorrowMut, f32::consts::SQRT_2, vec};
+use std::ops::{Add, Mul};
 
+use num_traits::{float::FloatCore, Float};
+use  half::f16;
 use crate::tensor::Tensor;
+// 定义一个 trait，包含必要的操作
+pub trait MyFloat: Copy+Default+Float+ std::ops::DivAssign+ std::iter::Sum + std::ops::AddAssign
+{
+
+}
+
+// 为 f32 实现 Float trait
+impl MyFloat for f32 {
+}
+// 为 f16 实现 Float trait（需要 half crate）
+impl MyFloat for f16 {
+}
+
 /// 获取编码后，每个词代表的向量，组成一个矩阵
+
 // get (row) vectors from a 2D table given a list of indices
-pub fn gather(y: &mut Tensor<f32>, indices: &Tensor<u32>, table: &Tensor<f32>) {
+pub fn gather<T:MyFloat>(y: &mut Tensor<T>, indices: &Tensor<u32>, table: &Tensor<T>) {
+    
     let length = indices.size();
     let table_shape = table.shape();
     assert!(table_shape.len() == 2);
@@ -17,7 +34,7 @@ pub fn gather(y: &mut Tensor<f32>, indices: &Tensor<u32>, table: &Tensor<f32>) {
 }
 
 // RoPE: Rotary Positional Embedding
-pub fn rope(y: &mut Tensor<f32>, start_pos: usize, theta: f32) {
+pub fn rope<T:MyFloat>(y: &mut Tensor<f32>, start_pos: usize, theta: f32) {
     let shape = y.shape();
     assert!(shape.len() == 3);
     let seq_len = shape[0];
@@ -41,7 +58,7 @@ pub fn rope(y: &mut Tensor<f32>, start_pos: usize, theta: f32) {
 
 // softmax(x) = exp(x - max) / sum(exp(x - max))
 // y = softmax(mask(x))
-pub fn masked_softmax(y: &mut Tensor<f32>) {
+pub fn masked_softmax<T:MyFloat>(y: &mut Tensor<T>) {
     let ndim = y.shape().len();
     assert!(ndim >= 2);
     let seq_len = y.shape()[ndim - 2];
@@ -65,15 +82,14 @@ pub fn masked_softmax(y: &mut Tensor<f32>) {
                     data[offset + j] = e;
                     e
                 })
-                .sum::<f32>();
+                .sum::<T>();
 
             (0..boundary).for_each(|j| data[offset + j] /= sum);
-            (boundary..total_seq_len).for_each(|j| data[offset + j] = 0.0);
+            (boundary..total_seq_len).for_each(|j| data[offset + j] = T::default());
         }
     }
 }
-
-pub fn rms_norm(y: &mut Tensor<f32>, x: &Tensor<f32>, w: &Tensor<f32>, epsilon: f32) {
+pub fn rms_norm<T:MyFloat>(y: &mut Tensor<T>, x: &Tensor<T>, w: &Tensor<T>, epsilon: T) {
     let y_data = unsafe { y.data_mut() };
 
     let mut shape = vec![];
@@ -89,8 +105,8 @@ pub fn rms_norm(y: &mut Tensor<f32>, x: &Tensor<f32>, w: &Tensor<f32>, epsilon: 
         let sq = ((x.data()[row_range.clone()]
             .iter()
             .map(|&x| x.powi(2))
-            .sum::<f32>()
-            / shape[1] as f32)
+            .sum::<T>() //不支持直接转换，先转成f32，再转成T
+            / (T::from(shape[1] as f32)).unwrap())
             + epsilon)
             .sqrt();
         y_data[row_range.clone()]
@@ -102,22 +118,23 @@ pub fn rms_norm(y: &mut Tensor<f32>, x: &Tensor<f32>, w: &Tensor<f32>, epsilon: 
     }
 }
 
-// y = sigmoid(x) * x * y
+// y = sigmoid(x) * x * yT
 // hint: this is an element-wise operation
-pub fn silu(y: &mut Tensor<f32>, x: &Tensor<f32>) {
+pub fn silu<T:MyFloat>(y: &mut Tensor<T>, x: &Tensor<T>) {
     let len = y.size();
     assert!(len == x.size());
 
     let y_data = unsafe { y.data_mut() };
     let x_data = x.data();
     for i in 0..x_data.len() {
-        y_data[i] = y_data[i] * x_data[i] / (1.0 + (-x_data[i]).exp())
+        y_data[i] = y_data[i] * x_data[i] / (T::one()+(-x_data[i]).exp())
     }
 }
 
 // C = beta * C + alpha * A @ B^T
 // hint: You don't need to do an explicit transpose of B
-pub fn matmul_transb(c: &mut Tensor<f32>, beta: f32, a: &Tensor<f32>, b: &Tensor<f32>, alpha: f32) {
+pub fn matmul_transb<T:MyFloat>(c: &mut Tensor<T>, beta: T, a: &Tensor<T>, b: &Tensor<T>, alpha: T)
+{
     assert!(
         b.shape().len() == 2,
         "matmul_transb of dimensions must be at least 2"
@@ -140,7 +157,7 @@ pub fn matmul_transb(c: &mut Tensor<f32>, beta: f32, a: &Tensor<f32>, b: &Tensor
         let row = &a.data()[i * mid..(i + 1) * mid];
         for j in 0..shape[1] {
             let column = &b.data()[j * mid..(j + 1) * mid];
-            c_data[offset] = alpha * row.iter().zip(column).map(|(a, b)| a * b).sum::<f32>()
+            c_data[offset] = alpha * row.iter().zip(column).map(|(a, b)| *a * *b).sum::<T>()
                 + c_data[offset] * beta;
             offset += 1;
         }
@@ -148,7 +165,8 @@ pub fn matmul_transb(c: &mut Tensor<f32>, beta: f32, a: &Tensor<f32>, b: &Tensor
 }
 // 向量乘法
 // t判断是否需要转置,alpha,参数暂未使用
-pub fn vec_multi(c: &mut Tensor<f32>, a: &Tensor<f32>, b: &Tensor<f32>, alpha: f32, t: bool) {
+pub fn vec_multi<T:MyFloat>(c: &mut Tensor<T>, a: &Tensor<T>, b: &Tensor<T>, alpha: T, t: bool) 
+{
     // 判断c，长度是否大于二
     assert!(
         c.shape().len() > 2,
@@ -173,7 +191,7 @@ pub fn vec_multi(c: &mut Tensor<f32>, a: &Tensor<f32>, b: &Tensor<f32>, alpha: f
     let b_skip = b.shape()[1];
     let data = unsafe { c.data_mut() };
     // 清理脏数据
-    data.fill(0.);
+    data.fill(T::zero());
     let mut c_data_offset = 0;
     if t {
         // 用于分组计算，每个输入，在每个请求头下的vjiv
@@ -190,7 +208,7 @@ pub fn vec_multi(c: &mut Tensor<f32>, a: &Tensor<f32>, b: &Tensor<f32>, alpha: f
                     data[c_data_offset] = a_tmp
                         .iter()
                         .zip(b_tmp.iter())
-                        .fold(0., |tmp, (a_val, b_val)| tmp + a_val * b_val)
+                        .fold(T::zero(), |tmp, (a_val, b_val)| tmp + *a_val * *b_val)
                         * alpha;
                     c_data_offset += 1;
                 }
@@ -200,7 +218,7 @@ pub fn vec_multi(c: &mut Tensor<f32>, a: &Tensor<f32>, b: &Tensor<f32>, alpha: f
 }
 // 只用于得分计算
 // a代表所处理的权重,b代表所要乘的向量
-pub fn vec_multi_wight(c: &mut Tensor<f32>, a: &Tensor<f32>, b: &Tensor<f32>) {
+pub fn vec_multi_wight<T:MyFloat>(c: &mut Tensor<T>, a: &Tensor<T>, b: &Tensor<T>) {
     assert!(
         b.shape().len() == 2,
         "matmul_transb of dimensions must be at least 2"
@@ -220,7 +238,7 @@ pub fn vec_multi_wight(c: &mut Tensor<f32>, a: &Tensor<f32>, b: &Tensor<f32>) {
     let b_column = b.shape()[1];
     let mut data = unsafe { c.data_mut() };
     // 清理脏数据
-    data.fill(0.);
+    data.fill(T::zero());
     for i in 0..q_header_len {
         // 获取当前q下的的全部注意力
         let a_data = &a.data()[i * row * column..(i + 1) * row * column];
@@ -240,7 +258,7 @@ pub fn vec_multi_wight(c: &mut Tensor<f32>, a: &Tensor<f32>, b: &Tensor<f32>) {
                     let tmp_offset = b_data_row_offset * b_column + (i / n_groups) * vec_len;
                     let b_data = &b.data()[tmp_offset..tmp_offset + vec_len];
                     b_data.iter().zip(tmp_c.iter_mut()).for_each(|(t_b, t_c)| {
-                        *t_c += t_b * tmp;
+                        *t_c += *t_b * *tmp;
                     });
                     // 进行偏移
                     b_data_row_offset += 1;
@@ -251,12 +269,12 @@ pub fn vec_multi_wight(c: &mut Tensor<f32>, a: &Tensor<f32>, b: &Tensor<f32>) {
 
 // Dot product of two tensors (treated as vectors)
 #[allow(unused)]
-pub fn dot(x: &Tensor<f32>, y: &Tensor<f32>) -> f32 {
+pub fn dot<T:MyFloat>(x: &Tensor<T>, y: &Tensor<T>) -> T {
     let len = x.size();
     assert!(len == y.size());
     let x_ = x.data();
     let y_ = y.data();
-    let mut sum = 0.0;
+    let mut sum = T::zero();
     for i in 0..len {
         sum += x_[i] * y_[i];
     }

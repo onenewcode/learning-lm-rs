@@ -1,5 +1,3 @@
-use std::borrow::BorrowMut;
-use std::cell::RefCell;
 use std::fs::File;
 use std::vec;
 
@@ -10,7 +8,7 @@ use crate::operators::{
 };
 use crate::params::LLamaParams;
 use crate::tensor::Tensor;
-use safetensors::{tensor, SafeTensors};
+use safetensors::SafeTensors;
 use std::path::Path;
 pub struct Llama<T> {
     vocab: usize,    // vocab size
@@ -104,12 +102,12 @@ impl Llama<f32> {
             OP::matmul_transb(k, 0., &hidden_states, &self.params.wk[layer], 1.0);
             OP::matmul_transb(v, 0., &hidden_states, &self.params.wv[layer], 1.0);
             //  每个词向量对应的查询矩阵
-            OP::rope(
+            OP::rope::<f32>(
                 q.reshape(&vec![seq_len, self.n_q_h, self.dqkv]),
                 past_seq_len,
                 self.rope_theta,
             );
-            OP::rope(
+            OP::rope::<f32>(
                 k.reshape(&vec![seq_len, self.n_kv_h, self.dqkv]),
                 past_seq_len,
                 self.rope_theta,
