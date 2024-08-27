@@ -1,10 +1,10 @@
 use std::ops::{Add, Mul};
 
-use num_traits::{float::FloatCore, Float};
+use num_traits::{float::FloatCore, Float, FromPrimitive};
 use  half::f16;
 use crate::tensor::Tensor;
 // 定义一个 trait，包含必要的操作
-pub trait MyFloat: Copy+Default+Float+ std::ops::DivAssign+ std::iter::Sum + std::ops::AddAssign
+pub trait MyFloat: Copy+Default+Float+ std::ops::DivAssign+ std::iter::Sum + std::ops::AddAssign+ FromPrimitive
 {
 
 }
@@ -34,7 +34,7 @@ pub fn gather<T:MyFloat>(y: &mut Tensor<T>, indices: &Tensor<u32>, table: &Tenso
 }
 
 // RoPE: Rotary Positional Embedding
-pub fn rope<T:MyFloat>(y: &mut Tensor<f32>, start_pos: usize, theta: f32) {
+pub fn rope<T:MyFloat>(y: &mut Tensor<T>, start_pos: usize, theta: T) {
     let shape = y.shape();
     assert!(shape.len() == 3);
     let seq_len = shape[0];
@@ -47,7 +47,8 @@ pub fn rope<T:MyFloat>(y: &mut Tensor<f32>, start_pos: usize, theta: f32) {
             for i in 0..d / 2 {
                 let a = data[tok * n_heads * d + head * d + i];
                 let b = data[tok * n_heads * d + head * d + i + d / 2];
-                let freq = pos as f32 / theta.powf((i * 2) as f32 / d as f32);
+                //自定义转换
+                let freq = T::from_usize(pos).unwrap() / theta.powf(T::from_usize(i * 2).unwrap() / T::from_usize(d).unwrap());
                 let (sin, cos) = freq.sin_cos();
                 data[tok * n_heads * d + head * d + i] = a * cos - b * sin;
                 data[tok * n_heads * d + head * d + i + d / 2] = b * cos + a * sin;
@@ -282,7 +283,7 @@ pub fn dot<T:MyFloat>(x: &Tensor<T>, y: &Tensor<T>) -> T {
 }
 
 // Sample a index from a tensor (treated as a probability vector)
-pub fn random_sample(x: &Tensor<f32>, top_p: f32, top_k: u32, temperature: f32) -> u32 {
+pub fn random_sample<T:MyFloat>(x: &Tensor<T>, top_p: f32, top_k: u32, temperature: f32) -> u32 {
     assert!(x.shape()[x.shape().len() - 1] == x.size());
     if temperature <= 0. || top_k < 2 || top_p <= 0. {
         return x
@@ -330,7 +331,10 @@ pub fn random_sample(x: &Tensor<f32>, top_p: f32, top_k: u32, temperature: f32) 
         .data()
         .iter()
         .enumerate()
-        .map(Probability::from)
+        .map(|(u,t)|
+            {
+                Probability::from((u,&t.to_f32().unwrap()))
+            })
         .collect::<Vec<_>>();
     logits.sort_unstable();
     let max = core::mem::replace(&mut logits[0].val, 1.);

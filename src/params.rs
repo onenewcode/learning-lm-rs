@@ -1,7 +1,7 @@
 use core::slice;
 use std::alloc::LayoutErr;
 
-use crate::config::LlamaConfigJson;
+use crate::{config::LlamaConfigJson, operators::MyFloat};
 use crate::tensor::Tensor;
 use safetensors::{SafeTensors, View};
 pub struct LLamaParams<T> {
@@ -23,7 +23,9 @@ pub struct LLamaParams<T> {
     pub lm_head: Tensor<T>,   // (vocab_size, dim)
 }
 
-impl LLamaParams<f32> {
+impl <T>LLamaParams<T>
+where T:MyFloat
+{
     pub fn from_safetensors(safetensor: &SafeTensors, config: &LlamaConfigJson) -> Self {
         let layers = config.num_hidden_layers;
         safetensor.names().iter().for_each(|name| {
@@ -35,7 +37,7 @@ impl LLamaParams<f32> {
                     let p: usize = data.shape().iter().product();
                     // 获取引用，只目前只转换成f32类型
                     let new_data =
-                        unsafe { slice::from_raw_parts(data.data().as_ptr() as *const f32, p) };
+                        unsafe { slice::from_raw_parts(data.data().as_ptr() as *const T, p) };
                     // 生成新对象
                     Tensor::new(Vec::from(new_data), &data.shape().to_vec())
                 }
