@@ -1,4 +1,5 @@
 use std::ops::{Add, Mul};
+use std::vec;
 
 use num_traits::{float::FloatCore, Float, FromPrimitive};
 use  half::f16;

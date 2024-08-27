@@ -10,6 +10,7 @@ use crate::params::LLamaParams;
 use crate::tensor::Tensor;
 use safetensors::SafeTensors;
 use std::path::Path;
+use tokio::sync::mpsc::UnboundedSender;
 pub struct Llama<T> {
     vocab: usize,    // vocab size
     n_layers: usize, // number of layers
@@ -60,8 +61,7 @@ where T:MyFloat
     // 推理单元重复使用
     pub fn forward(&self, input: &Tensor<u32>, cache: &mut KVCache<T>) -> Tensor<T> {
         // 输入文本的长度
-        let seq_len = input.size(); // 默认解码长度为6
-                                    // 已经处理过的文本的长度
+        let seq_len = input.size();
         let past_seq_len = cache.len();
         // 更新已经处理过的文本的长度
         cache.increment(seq_len);
@@ -178,42 +178,43 @@ where T:MyFloat
 
     pub fn generate(
         &self,
+        kvcache: &mut KVCache<f32>, //kv缓存
         token_ids: &[u32],
-        max_len: usize,
         top_p: f32,
         top_k: u32,
         temperature: f32,
+        sender: UnboundedSender<u32>,
     ) -> Vec<u32> {
         let mut result = Vec::<u32>::new();
-        let mut cache = self.new_cache();
         let input = Tensor::<u32>::new(Vec::from(token_ids), &vec![token_ids.len()]);
         // 推理用户输入的信息
-        let mut tmp=Tensor::<u32>::new(vec![OP::random_sample(
-            &self.forward(&input, &mut cache),
-            top_p,
-            top_k,
-            temperature,
-        )],&vec![1]) ;
-        // 获取临时数据
-  
-        result.push(tmp.data()[0]);
-        for _ in 0..max_len{
-            // 更新最新推理的数据
-            let tt=OP::random_sample(
-                &self.forward(&tmp, &mut cache),
+        let mut tmp = Tensor::<u32>::new(
+            vec![OP::random_sample(
+                &self.forward(&input, kvcache),
                 top_p,
                 top_k,
                 temperature,
-            );
-            // 检查是否为<|end_story|>
-            if tt==2 {
-                break;
+            )],
+            &vec![1],
+        );
+        // 获取临时数据
+
+        result.push(tmp.data()[0]);
+        while kvcache.len() < self.max_seq_len && tmp.data()[0] != self.eos_token_id {
+            match sender.send(tmp.data()[0]) {
+                Ok(_) => {}
+                Err(v) => {
+                    println!("{:?}", v);
+                }
             }
+            // 更新最新推理的数据
+            let tt = OP::random_sample(&self.forward(&tmp, kvcache), top_p, top_k, temperature);
             result.push(tt);
             unsafe {
-                tmp.data_mut()[0]=tt;
+                tmp.data_mut()[0] = tt;
             }
         }
+        let _ = sender.clone();
         result
     }
 }
