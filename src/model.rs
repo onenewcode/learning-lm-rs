@@ -178,7 +178,7 @@ where T:MyFloat
 
     pub fn generate(
         &self,
-        kvcache: &mut KVCache<f32>, //kv缓存
+        kvcache: &mut KVCache<T>, //kv缓存
         token_ids: &[u32],
         top_p: f32,
         top_k: u32,

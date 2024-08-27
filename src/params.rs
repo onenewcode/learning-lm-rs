@@ -45,7 +45,7 @@ where T:MyFloat
             }
         };
         Self {
-            embedding_table: get_tensor("lm_head.weight"),
+            embedding_table: get_tensor("model.embed_tokens.weight"),
             rms_att_w: (0..layers)
                 .map(|i| get_tensor(&format!("model.layers.{i}.input_layernorm.weight")))
                 .collect(),
