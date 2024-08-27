@@ -1,5 +1,5 @@
 use crate::{
-    cache::{self, Cache, CACHE_MANGER},
+    cache::{self, Cache, CACHE_MANGER_F32 as CACHE_MANGER},
     chat::chat::Chat,
 };
 use std::{
@@ -19,7 +19,7 @@ pub async fn cmd_server() {
     let stdin = io::stdin();
     let mut handle = stdin.lock();
     // 初始化默认Chat
-    let mut chat = Arc::new(Chat::new_chat("1".to_owned(), cache::Cache::new_cmanger()));
+    let mut chat = Arc::new(Chat::new_chat("1".to_owned(), cache::Cache::<f32>::new_cmanger()));
     // 限制作用域
     {
         // 初始化
@@ -52,7 +52,7 @@ pub async fn cmd_server() {
                         }
                         None => {
                             println!("未查询到缓存，新生成chat {}", id);
-                            let tmp_cache = Cache::new_cmanger();
+                            let tmp_cache = Cache::<f32>::new_cmanger();
                             CACHE_MANGER
                                 .get_mut()
                                 .unwrap()

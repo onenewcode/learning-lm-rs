@@ -1,4 +1,4 @@
-use crate::{cache::Cache, model::Llama, print_now, MY_LLAMA, MY_TOKENIZER};
+use crate::{cache::Cache, model::Llama, operators::MyFloat, print_now, MY_LLAMA_F32, MY_TOKENIZER};
 use std::sync::{Arc, Mutex};
 use tokenizers::Tokenizer;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
@@ -9,12 +9,12 @@ const RENDER: &str = "<|im_start|>system
 {user_message}<|im_end|>
 <|im_start|>";
 const ROLE: &str = "assistant <s>";
-pub struct Chat<C: Default + Copy> {
+pub struct Chat<C: Default + Copy+MyFloat> {
     // 对话id
     id: String,
-    // 管理对话历史 todo
+    // 管理对话历史 todoC
     // 模型参数
-    model: Arc<Llama<f32>>,
+    model: Arc<Llama<C>>,
     tokenizer: Arc<Tokenizer>,
     // 缓存 RefCell
     cache: Arc<Mutex<Cache<C>>>,
@@ -39,7 +39,7 @@ impl Chat<f32> {
     pub fn new_chat(id: String, cache: Arc<Mutex<Cache<f32>>>) -> Self {
         Chat {
             id,
-            model: MY_LLAMA.get().unwrap().clone(),
+            model:MY_LLAMA_F32.get().unwrap().clone(),
             cache: cache,
             tokenizer: MY_TOKENIZER.get().unwrap().clone(),
         }

@@ -14,7 +14,9 @@ mod tensor;
 use clap::{Args, Parser, Subcommand};
 use model::Llama;
 use tokenizers::Tokenizer;
-static MY_LLAMA: OnceLock<Arc<Llama<f32>>> = OnceLock::new();
+use half::f16;
+static MY_LLAMA_F32: OnceLock<Arc<Llama<f32>>> = OnceLock::new();
+static MY_LLAMA_F16: OnceLock<Arc<Llama<f16>>> = OnceLock::new();
 static MY_TOKENIZER: OnceLock<Arc<Tokenizer>> = OnceLock::new();
 trait ShutDownCallback {
     fn shut_down_callback(&self);
@@ -25,7 +27,7 @@ async fn main() {
     let project_dir = env!("CARGO_MANIFEST_DIR");
     let model_dir = PathBuf::from(project_dir).join("models").join("chat");
     // 初始化一些全局变量
-    let _ = MY_LLAMA.set(Arc::new(model::Llama::<f32>::from_safetensors(&model_dir)));
+    let _ = MY_LLAMA_F32.set(Arc::new(model::Llama::<f32>::from_safetensors(&model_dir)));
     let _ = MY_TOKENIZER.set(Arc::new(
         Tokenizer::from_file(model_dir.join("tokenizer.json")).unwrap(),
     ));
