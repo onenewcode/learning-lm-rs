@@ -19,7 +19,7 @@ pub async fn cmd_server() {
     let stdin = io::stdin();
     let mut handle = stdin.lock();
     // 初始化默认Chat
-    let mut chat = Arc::new(Chat::new_chat("1".to_owned(), cache::Cache::<f32>::new_cmanger()));
+    let mut chat = Arc::new(Chat::<f32>::new_chat("1".to_owned(), cache::Cache::<f32>::new_cmanger()));
     // 限制作用域
     {
         // 初始化
@@ -48,7 +48,7 @@ pub async fn cmd_server() {
                         // 能够查询到缓存
                         Some(ch) => {
                             println!("查询到缓存，转换到chat {}", id);
-                            chat = Arc::new(Chat::new_chat(id, ch.clone()));
+                            chat = Arc::new(Chat::<f32>::new_chat(id, ch.clone()));
                         }
                         None => {
                             println!("未查询到缓存，新生成chat {}", id);
@@ -57,7 +57,7 @@ pub async fn cmd_server() {
                                 .get_mut()
                                 .unwrap()
                                 .insert(id.clone(), tmp_cache.clone());
-                            chat = Arc::new(Chat::new_chat(id, tmp_cache));
+                            chat = Arc::new(Chat::<f32>::new_chat(id, tmp_cache));
                         }
                     }
                 };
