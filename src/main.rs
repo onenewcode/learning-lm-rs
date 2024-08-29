@@ -1,4 +1,5 @@
 #![feature(once_cell_get_mut)]
+#![feature(f16)]
 use std::{
     path::PathBuf,
     sync::{Arc, OnceLock},
@@ -14,7 +15,7 @@ mod tensor;
 use clap::{Args, Parser, Subcommand};
 use model::Llama;
 use tokenizers::Tokenizer;
-static MY_LLAMA: OnceLock<Arc<Llama<f32>>> = OnceLock::new();
+static MY_LLAMA: OnceLock<Arc<Llama<f16>>> = OnceLock::new();
 static MY_TOKENIZER: OnceLock<Arc<Tokenizer>> = OnceLock::new();
 trait ShutDownCallback {
     fn shut_down_callback(&self);
@@ -23,9 +24,9 @@ trait ShutDownCallback {
 async fn main() {
     // 加载模型
     let project_dir = env!("CARGO_MANIFEST_DIR");
-    let model_dir = PathBuf::from(project_dir).join("models").join("chat");
+    let model_dir = PathBuf::from(project_dir).join("models").join("chat_f16");
     // 初始化一些全局变量
-    let _ = MY_LLAMA.set(Arc::new(model::Llama::<f32>::from_safetensors(&model_dir)));
+    let _ = MY_LLAMA.set(Arc::new(model::Llama::<f16>::from_safetensors(&model_dir)));
     let _ = MY_TOKENIZER.set(Arc::new(
         Tokenizer::from_file(model_dir.join("tokenizer.json")).unwrap(),
     ));

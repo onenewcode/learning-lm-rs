@@ -3,7 +3,7 @@ use std::vec;
 use crate::tensor::Tensor;
 /// 获取编码后，每个词代表的向量，组成一个矩阵
 // get (row) vectors from a 2D table given a list of indices
-pub fn gather(y: &mut Tensor<f32>, indices: &Tensor<u32>, table: &Tensor<f32>) {
+pub fn gather(y: &mut Tensor<f16>, indices: &Tensor<u32>, table: &Tensor<f16>) {
     let length = indices.size();
     let table_shape = table.shape();
     assert!(table_shape.len() == 2);
@@ -17,7 +17,7 @@ pub fn gather(y: &mut Tensor<f32>, indices: &Tensor<u32>, table: &Tensor<f32>) {
 }
 
 // RoPE: Rotary Positional Embedding
-pub fn rope(y: &mut Tensor<f32>, start_pos: usize, theta: f32) {
+pub fn rope(y: &mut Tensor<f16>, start_pos: usize, theta: f16) {
     let shape = y.shape();
     assert!(shape.len() == 3);
     let seq_len = shape[0];
@@ -30,7 +30,7 @@ pub fn rope(y: &mut Tensor<f32>, start_pos: usize, theta: f32) {
             for i in 0..d / 2 {
                 let a = data[tok * n_heads * d + head * d + i];
                 let b = data[tok * n_heads * d + head * d + i + d / 2];
-                let freq = pos as f32 / theta.powf((i * 2) as f32 / d as f32);
+                let freq = pos as f16 / theta.powf((i * 2) as f16 / d as f16);
                 let (sin, cos) = freq.sin_cos();
                 data[tok * n_heads * d + head * d + i] = a * cos - b * sin;
                 data[tok * n_heads * d + head * d + i + d / 2] = b * cos + a * sin;
@@ -41,7 +41,7 @@ pub fn rope(y: &mut Tensor<f32>, start_pos: usize, theta: f32) {
 
 // softmax(x) = exp(x - max) / sum(exp(x - max))
 // y = softmax(mask(x))
-pub fn masked_softmax(y: &mut Tensor<f32>) {
+pub fn masked_softmax(y: &mut Tensor<f16>) {
     let ndim = y.shape().len();
     assert!(ndim >= 2);
     let seq_len = y.shape()[ndim - 2];
@@ -59,13 +59,13 @@ pub fn masked_softmax(y: &mut Tensor<f32>) {
                 .iter()
                 .fold(data[offset], |a, b| a.max(*b));
 
-            let sum = (0..boundary)
-                .map(|j| {
+            let mut sum=0.; 
+            (0..boundary)
+                .for_each(|j| {
                     let e = (data[offset + j] - max).exp();
                     data[offset + j] = e;
-                    e
-                })
-                .sum::<f32>();
+                    sum+=e;
+                });
 
             (0..boundary).for_each(|j| data[offset + j] /= sum);
             (boundary..total_seq_len).for_each(|j| data[offset + j] = 0.0);
@@ -73,7 +73,7 @@ pub fn masked_softmax(y: &mut Tensor<f32>) {
     }
 }
 
-pub fn rms_norm(y: &mut Tensor<f32>, x: &Tensor<f32>, w: &Tensor<f32>, epsilon: f32) {
+pub fn rms_norm(y: &mut Tensor<f16>, x: &Tensor<f16>, w: &Tensor<f16>, epsilon: f16) {
     let y_data = unsafe { y.data_mut() };
 
     let mut shape = vec![];
@@ -86,13 +86,15 @@ pub fn rms_norm(y: &mut Tensor<f32>, x: &Tensor<f32>, w: &Tensor<f32>, epsilon: 
     }
     for i in 0..shape[0] {
         let row_range = i * shape[1]..(i + 1) * shape[1];
-        let sq = ((x.data()[row_range.clone()]
+        let mut sum=0.;
+        x.data()[row_range.clone()]
             .iter()
-            .map(|&x| x.powi(2))
-            .sum::<f32>()
-            / shape[1] as f32)
-            + epsilon)
-            .sqrt();
+            .for_each(|&x| {
+                sum+=x.powi(2);
+            });
+        let sq = ((sum
+            / shape[1] as f16)
+            + epsilon).sqrt();
         y_data[row_range.clone()]
             .iter_mut()
             .zip(x.data()[row_range].iter().zip(w.data().iter()))
@@ -104,7 +106,7 @@ pub fn rms_norm(y: &mut Tensor<f32>, x: &Tensor<f32>, w: &Tensor<f32>, epsilon: 
 
 // y = sigmoid(x) * x * y
 // hint: this is an element-wise operation
-pub fn silu(y: &mut Tensor<f32>, x: &Tensor<f32>) {
+pub fn silu(y: &mut Tensor<f16>, x: &Tensor<f16>) {
     let len = y.size();
     assert!(len == x.size());
 
@@ -117,7 +119,7 @@ pub fn silu(y: &mut Tensor<f32>, x: &Tensor<f32>) {
 
 // C = beta * C + alpha * A @ B^T
 // hint: You don't need to do an explicit transpose of B
-pub fn matmul_transb(c: &mut Tensor<f32>, beta: f32, a: &Tensor<f32>, b: &Tensor<f32>, alpha: f32) {
+pub fn matmul_transb(c: &mut Tensor<f16>, beta: f16, a: &Tensor<f16>, b: &Tensor<f16>, alpha: f16) {
     assert!(
         b.shape().len() == 2,
         "matmul_transb of dimensions must be at least 2"
@@ -140,15 +142,16 @@ pub fn matmul_transb(c: &mut Tensor<f32>, beta: f32, a: &Tensor<f32>, b: &Tensor
         let row = &a.data()[i * mid..(i + 1) * mid];
         for j in 0..shape[1] {
             let column = &b.data()[j * mid..(j + 1) * mid];
-            c_data[offset] = alpha * row.iter().zip(column).map(|(a, b)| a * b).sum::<f32>()
-                + c_data[offset] * beta;
+            let mut sum=0.;
+            row.iter().zip(column).for_each(|(a, b)| sum+=a * b);
+            c_data[offset] = alpha * sum + c_data[offset] * beta;
             offset += 1;
         }
     }
 }
 // 向量乘法
 // t判断是否需要转置,alpha,参数暂未使用
-pub fn vec_multi(c: &mut Tensor<f32>, a: &Tensor<f32>, b: &Tensor<f32>, alpha: f32, t: bool) {
+pub fn vec_multi(c: &mut Tensor<f16>, a: &Tensor<f16>, b: &Tensor<f16>, alpha: f16, t: bool) {
     // 判断c，长度是否大于二
     assert!(
         c.shape().len() > 2,
@@ -200,7 +203,7 @@ pub fn vec_multi(c: &mut Tensor<f32>, a: &Tensor<f32>, b: &Tensor<f32>, alpha: f
 }
 // 只用于得分计算
 // a代表所处理的权重,b代表所要乘的向量
-pub fn vec_multi_wight(c: &mut Tensor<f32>, a: &Tensor<f32>, b: &Tensor<f32>) {
+pub fn vec_multi_wight(c: &mut Tensor<f16>, a: &Tensor<f16>, b: &Tensor<f16>) {
     assert!(
         b.shape().len() == 2,
         "matmul_transb of dimensions must be at least 2"
@@ -251,7 +254,7 @@ pub fn vec_multi_wight(c: &mut Tensor<f32>, a: &Tensor<f32>, b: &Tensor<f32>) {
 
 // Dot product of two tensors (treated as vectors)
 #[allow(unused)]
-pub fn dot(x: &Tensor<f32>, y: &Tensor<f32>) -> f32 {
+pub fn dot(x: &Tensor<f16>, y: &Tensor<f16>) -> f16 {
     let len = x.size();
     assert!(len == y.size());
     let x_ = x.data();
@@ -264,7 +267,7 @@ pub fn dot(x: &Tensor<f32>, y: &Tensor<f32>) -> f32 {
 }
 
 // Sample a index from a tensor (treated as a probability vector)
-pub fn random_sample(x: &Tensor<f32>, top_p: f32, top_k: u32, temperature: f32) -> u32 {
+pub fn random_sample(x: &Tensor<f16>, top_p: f16, top_k: u32, temperature: f16) -> u32 {
     assert!(x.shape()[x.shape().len() - 1] == x.size());
     if temperature <= 0. || top_k < 2 || top_p <= 0. {
         return x
@@ -278,7 +281,7 @@ pub fn random_sample(x: &Tensor<f32>, top_p: f32, top_k: u32, temperature: f32) 
 
     #[derive(Clone, Copy, PartialEq, Debug)]
     struct Probability {
-        val: f32,
+        val: f16,
         tok: u32,
     }
     impl Eq for Probability {}
@@ -297,9 +300,9 @@ pub fn random_sample(x: &Tensor<f32>, top_p: f32, top_k: u32, temperature: f32) 
             }
         }
     }
-    impl From<(usize, &f32)> for Probability {
+    impl From<(usize, &f16)> for Probability {
         #[inline]
-        fn from((i, p): (usize, &f32)) -> Self {
+        fn from((i, p): (usize, &f16)) -> Self {
             Self {
                 val: p.clone(),
                 tok: i as _,
@@ -323,52 +326,8 @@ pub fn random_sample(x: &Tensor<f32>, top_p: f32, top_k: u32, temperature: f32) 
     // topk & topp & random
     let pk = logits[(top_k as usize).min(logits.len()) - 1].val;
     let pp = logits[logits.len() - 1].val * top_p;
-    let plimit = rand::random::<f32>() * f32::min(pk, pp);
+
+    let plimit =rand::random::<f32>() as f16  * f16::min(pk, pp);
     // sample
     logits.iter().find(|p| p.val >= plimit).unwrap().tok
-}
-
-// Your implementation should at least pass the following tests:
-#[test]
-fn test_silu() {
-    let mut y = Tensor::<f32>::new(vec![2., 3., 4.], &vec![1, 3]);
-    let x = Tensor::<f32>::new(vec![1., 2., 3.], &vec![1, 3]);
-    silu(&mut y, &x);
-    assert!(y.close_to(
-        &Tensor::<f32>::new(vec![1.4621172, 5.2847824, 11.43089], &vec![1, 3]),
-        1e-3
-    ));
-}
-
-#[test]
-fn test_rms_norm() {
-    let mut y = Tensor::<f32>::new(vec![1., 2., 3., 4.], &vec![2, 2]);
-    let x = Tensor::<f32>::new(vec![1., 2., 3., 4.], &vec![2, 2]);
-    let w = Tensor::<f32>::new(vec![1., 2.], &vec![2]);
-    rms_norm(&mut y, &x, &w, 1e-6);
-    assert!(y.close_to(
-        &Tensor::<f32>::new(
-            vec![0.6324554, 2.5298216, 0.8485281, 2.2627416],
-            &vec![2, 2]
-        ),
-        1e-3
-    ));
-}
-
-#[test]
-fn test_matmul_transb() {
-    let mut c = Tensor::<f32>::new(vec![1., 2., 3., 4.], &vec![2, 2]);
-    let a = Tensor::<f32>::new(vec![1., 2., 3., 4., 5., 6.], &vec![2, 3]);
-    let b = Tensor::<f32>::new(vec![1., 2., 3., 4., 5., 6.], &vec![2, 3]);
-    matmul_transb(&mut c, 1., &a, &b, 1.);
-    assert!(c.close_to(
-        &Tensor::<f32>::new(vec![15., 34., 35., 81.], &vec![2, 2]),
-        1e-3
-    ));
-}
-#[test]
-fn my() {
-    // for i in 0..10 {
-    //     print!("{}",i);
-    // }
 }

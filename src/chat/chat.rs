@@ -6,26 +6,30 @@ use std::{
 use tokenizers::Tokenizer;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 // 固定模板
-const RENDER: &str = "<|im_start|>";
-const ROLE: &str = "system <s>";
+const RENDER: &str = "<|im_start|>system
+{system_message}<|im_end|>
+<|im_start|>user
+{user_message}<|im_end|>
+<|im_start|>";
+const ROLE: &str = "assistant <s>";
 pub struct Chat<C: Default + Copy> {
     // 对话id
     id: String,
     // 管理对话历史 todo
     // 模型参数
-    model: Arc<Llama<f32>>,
+    model: Arc<Llama<f16>>,
     tokenizer: Arc<Tokenizer>,
     // 缓存 RefCell
     cache: Arc<Mutex<Cache<C>>>,
     // 最大长度
 }
-impl Chat<f32> {
+impl Chat<f16> {
     pub fn new(
         id: String,
-        model: Arc<Llama<f32>>,
-        cache: Arc<Mutex<Cache<f32>>>,
+        model: Arc<Llama<f16>>,
+        cache: Arc<Mutex<Cache<f16>>>,
         tokenizer: Arc<Tokenizer>,
-    ) -> Chat<f32> {
+    ) -> Chat<f16> {
         // 判断是否加载以前的对话 todo
         // 如果有对话历史，加载以前的对话
         Chat {
@@ -35,7 +39,7 @@ impl Chat<f32> {
             tokenizer: tokenizer,
         }
     }
-    pub fn new_chat(id: String, cache: Arc<Mutex<Cache<f32>>>) -> Self {
+    pub fn new_chat(id: String, cache: Arc<Mutex<Cache<f16>>>) -> Self {
         Chat {
             id,
             model: MY_LLAMA.get().unwrap().clone(),
@@ -63,11 +67,11 @@ impl Chat<f32> {
     }
     fn generate(
         input: &[u32],
-        cache: Arc<Mutex<Cache<f32>>>,
-        model: Arc<Llama<f32>>,
+        cache: Arc<Mutex<Cache<f16>>>,
+        model: Arc<Llama<f16>>,
         sender: UnboundedSender<u32>,
     ) {
-        let (top_p, top_k, temperature) = (0.9, 4, 1.);
+        let (top_p, top_k, temperature) = (0.9, 1, 1.);
         let mut kv = cache.lock().unwrap();
         // 添加输入信息，输入步长
         kv.append_info(input);
@@ -94,7 +98,7 @@ impl Chat<f32> {
     pub fn decode(&self, input: &[u32]) -> String {
         self.tokenizer.decode(input, true).unwrap()
     }
-    pub fn cache(&self) -> Arc<Mutex<Cache<f32>>> {
+    pub fn cache(&self) -> Arc<Mutex<Cache<f16>>> {
         self.cache.clone()
     }
     pub fn chat_id(&self) -> String {

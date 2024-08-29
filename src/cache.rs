@@ -5,7 +5,7 @@ use std::{
 };
 
 pub(crate) static mut CACHE_MANGER: OnceLock<CManger> = OnceLock::new();
-type CManger = HashMap<String, Arc<Mutex<Cache<f32>>>>;
+type CManger = HashMap<String, Arc<Mutex<Cache<f16>>>>;
 impl ShutDownCallback for CManger {
     // todo 持久化
     fn shut_down_callback(&self) {
@@ -71,7 +71,7 @@ impl<Storage: Default + Copy> Cache<Storage> {
         *self.info.last().unwrap()
     }
 }
-impl Cache<f32> {
+impl Cache<f16> {
     pub fn new_cmanger() -> Arc<Mutex<Self>> {
         // Arc::new(Mutex::new(Cache::new(MY_LLAMA.get().unwrap().new_cache())))
         Arc::new(Mutex::new(Self {

@@ -1,7 +1,7 @@
-use crate::config::LlamaConfigJson;
-use crate::tensor::Tensor;
 use core::slice;
-use safetensors::SafeTensors;
+use crate::tensor::Tensor;
+use crate::{config::LlamaConfigJson};
+use safetensors::{SafeTensors};
 pub struct LLamaParams<T> {
     // token_id to embedding lookup table
     pub embedding_table: Tensor<T>, // (vocab_size, dim)
@@ -21,24 +21,20 @@ pub struct LLamaParams<T> {
     pub lm_head: Tensor<T>,   // (vocab_size, dim)
 }
 
-impl LLamaParams<f32> {
+impl LLamaParams<f16>
+{
     pub fn from_safetensors(safetensor: &SafeTensors, config: &LlamaConfigJson) -> Self {
         let layers = config.num_hidden_layers;
         safetensor.names().iter().for_each(|name| {
             println!("{}", name);
         });
         let get_tensor = |name: &str| {
-            match safetensor.tensor(name) {
-                Ok(data) => {
-                    let p: usize = data.shape().iter().product();
-                    // 获取引用，只目前只转换成f32类型
-                    let new_data =
-                        unsafe { slice::from_raw_parts(data.data().as_ptr() as *const f32, p) };
-                    // 生成新对象
-                    Tensor::new(Vec::from(new_data), &data.shape().to_vec())
-                }
-                Err(err) => Tensor::default(&Vec::new()),
-            }
+            let tensor_view = safetensor.tensor(name).expect("Failed to get tensor");
+            let l:usize=tensor_view.shape().iter().product();
+            let data=unsafe {
+                slice::from_raw_parts(tensor_view.data().as_ptr() as *const f16, l)
+            };
+           Tensor::new(Vec::from(data), &tensor_view.shape().to_vec())
         };
         Self {
             embedding_table: get_tensor("model.embed_tokens.weight"),
@@ -46,13 +42,62 @@ impl LLamaParams<f32> {
                 .map(|i| get_tensor(&format!("model.layers.{i}.input_layernorm.weight")))
                 .collect(),
             wq: (0..layers)
-                .map(|i| get_tensor(&format!("model.layers.{i}.self_attn.q_proj.weight")))
-                .collect(),
+                .map(|i|{
+                    let t=&format!("model.layers.{i}.self_attn.qkv_proj.weight");
+                    match safetensor.tensor(t) {
+                        Ok(data) => {
+                            // 获取wq长度
+                            let start=2*0;
+                            let end: usize =2*(start+ config.hidden_size*config.hidden_size);
+                            let mut tdata = vec![];
+                            for chunk in data.data()[start..end].chunks_exact(2) {
+                                let bytes: [u8; 2] = chunk.try_into().expect("slice with incorrect length");
+                                let f = f16::from_le_bytes(bytes);
+                                tdata.push(f);
+                            }
+                            Tensor::new(tdata, &vec![config.hidden_size,config.hidden_size])
+                        }
+                        Err(err) => panic!("加载模型失败{:?}", err),
+                    }
+                }).collect(),
             wk: (0..layers)
-                .map(|i| get_tensor(&format!("model.layers.{i}.self_attn.k_proj.weight")))
+                .map(|i|{
+                    let t=&format!("model.layers.{i}.self_attn.qkv_proj.weight");
+                    match safetensor.tensor(t) {
+                        Ok(data) => {
+                        let start=2*(config.hidden_size*config.hidden_size);
+                        let end: usize = start+2*(config.hidden_size*config.hidden_size*config.num_key_value_heads/config.num_attention_heads);
+                        let mut tdata = vec![];
+                        for chunk in data.data()[start..end].chunks_exact(2) {
+                            let bytes: [u8; 2] = chunk.try_into().expect("slice with incorrect length");
+                            let f = f16::from_le_bytes(bytes);
+                            tdata.push(f);
+                        }
+                            Tensor::new(tdata, &vec![config.hidden_size*config.num_key_value_heads/config.num_attention_heads,config.hidden_size])
+                        }
+                        Err(err) => panic!("加载模型失败{:?}", err),
+                    }
+                } )
                 .collect(),
             wv: (0..layers)
-                .map(|i| get_tensor(&format!("model.layers.{i}.self_attn.v_proj.weight")))
+                .map(|i| {
+                    let t=&format!("model.layers.{i}.self_attn.qkv_proj.weight");
+                    match safetensor.tensor(t) {
+                        Ok(data) => {
+                            let start= 2*(config.hidden_size*(config.hidden_size+(config.hidden_size*config.num_key_value_heads/config.num_attention_heads)));
+                            let end=start+2*(config.hidden_size*config.hidden_size*config.num_key_value_heads/config.num_attention_heads);
+                            let mut tdata = vec![];
+                            for chunk in data.data()[start..end].chunks_exact(2) {
+                                let bytes: [u8; 2] = chunk.try_into().expect("slice with incorrect length");
+                                let f = f16::from_le_bytes(bytes);
+                                tdata.push(f);
+                            }
+                            let my= Tensor::new(tdata, &vec![config.hidden_size*config.num_key_value_heads/config.num_attention_heads,config.hidden_size]);
+                            my
+                        }
+                        Err(err) => panic!("加载模型失败{:?}", err),
+                    }
+                } )
                 .collect(),
             wo: (0..layers)
                 .map(|i| get_tensor(&format!("model.layers.{i}.self_attn.o_proj.weight")))
@@ -60,11 +105,47 @@ impl LLamaParams<f32> {
             rms_ffn_w: (0..layers)
                 .map(|i| get_tensor(&format!("model.layers.{i}.post_attention_layernorm.weight")))
                 .collect(),
-            w_up: (0..layers)
-                .map(|i| get_tensor(&format!("model.layers.{i}.mlp.up_proj.weight")))
-                .collect(),
             w_gate: (0..layers)
-                .map(|i| get_tensor(&format!("model.layers.{i}.mlp.gate_proj.weight")))
+                .map(|i|{
+                    let t=&format!("model.layers.{i}.mlp.gate_up_proj.weight");
+                    match safetensor.tensor(t) {
+                        Ok(data) => {
+                            let start=2*0;
+                            let end: usize =2*config.intermediate_size*config.hidden_size;
+                            // 获取引用，只目前只转换成f32类型
+                            let mut tdata = vec![];
+                            for chunk in data.data()[start..end].chunks_exact(2) {
+                                let bytes: [u8; 2] = chunk.try_into().expect("slice with incorrect length");
+                                let f = f16::from_le_bytes(bytes);
+                                tdata.push(f);
+                            }
+                            // 生成新对象
+                            Tensor::new(tdata,&vec![config.intermediate_size,config.hidden_size])
+                        }
+                        Err(err) => panic!("加载模型失败{:?}", err),
+                    }
+                } )
+                .collect(),
+                w_up: (0..layers)
+                .map(|i|{
+                    let t=&format!("model.layers.{i}.mlp.gate_up_proj.weight");
+                    match safetensor.tensor(t) {
+                        Ok(data) => {
+                            let start=2*(config.intermediate_size*config.hidden_size);
+                            let end: usize =start+ 2*(config.intermediate_size*config.hidden_size);
+                            // 获取引用，只目前只转换成f32类型
+                            let mut tdata = vec![];
+                            for chunk in data.data()[start..end].chunks_exact(2) {
+                                let bytes: [u8; 2] = chunk.try_into().expect("slice with incorrect length");
+                                let f = f16::from_le_bytes(bytes);
+                                tdata.push(f);
+                            }
+                            // 生成新对象
+                            Tensor::new(tdata, &vec![config.intermediate_size,config.hidden_size])
+                        }
+                        Err(err) => panic!("加载模型失败{:?}", err),
+                    }
+                } )
                 .collect(),
             w_down: (0..layers)
                 .map(|i| get_tensor(&format!("model.layers.{i}.mlp.down_proj.weight")))
