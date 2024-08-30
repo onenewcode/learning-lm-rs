@@ -1,7 +1,7 @@
 from transformers import AutoModel, AutoTokenizer
 import torch
 # excute from project directory.
-model_directory = "models/chat_f16"
+model_directory = "models/chat"
 
 model = AutoModel.from_pretrained(model_directory)
 
@@ -12,7 +12,7 @@ for name, param in model.named_parameters():
 
 tokenizer = AutoTokenizer.from_pretrained(model_directory)
 text = "Once upon a time"
-inputs = tokenizer(text, return_tensors="pt")
+inputs = tokenizer(text)
 outputs_dict = {}
 
 def hook_fn(layer_name):
