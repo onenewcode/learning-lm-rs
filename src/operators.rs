@@ -46,7 +46,6 @@ pub fn masked_softmax(y: &mut Tensor<f16>) {
     assert!(ndim >= 2);
     let seq_len = y.shape()[ndim - 2];
     let total_seq_len = y.shape()[ndim - 1];
-    // 获取n_q_h
     let batch = y.size() / (seq_len * total_seq_len);
     let data = unsafe { y.data_mut() };
     for b in 0..batch {
@@ -66,7 +65,13 @@ pub fn masked_softmax(y: &mut Tensor<f16>) {
                     data[offset + j] = e;
                     sum+=e;
                 });
-
+            // let sum = (0..boundary)
+            // .map(|j| {
+            //     let e = (data[offset + j] - max).exp();
+            //     data[offset + j] = e;
+            //     e
+            // })
+            // .sum::<f32>();
             (0..boundary).for_each(|j| data[offset + j] /= sum);
             (boundary..total_seq_len).for_each(|j| data[offset + j] = 0.0);
         }
@@ -251,21 +256,6 @@ pub fn vec_multi_wight(c: &mut Tensor<f16>, a: &Tensor<f16>, b: &Tensor<f16>) {
         }
     }
 }
-
-// Dot product of two tensors (treated as vectors)
-#[allow(unused)]
-pub fn dot(x: &Tensor<f16>, y: &Tensor<f16>) -> f16 {
-    let len = x.size();
-    assert!(len == y.size());
-    let x_ = x.data();
-    let y_ = y.data();
-    let mut sum = 0.0;
-    for i in 0..len {
-        sum += x_[i] * y_[i];
-    }
-    sum
-}
-
 // Sample a index from a tensor (treated as a probability vector)
 pub fn random_sample(x: &Tensor<f16>, top_p: f16, top_k: u32, temperature: f16) -> u32 {
     assert!(x.shape()[x.shape().len() - 1] == x.size());
