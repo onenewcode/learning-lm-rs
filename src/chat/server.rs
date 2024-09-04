@@ -3,14 +3,11 @@ use crate::{
     chat::chat::Chat,
 };
 use std::{
-    collections::HashMap,
-    io::{self, BufRead, Write},
-    process,
-    sync::Arc,
+    borrow::BorrowMut, collections::HashMap, io::{self, BufRead, Write}, process, sync::Arc
 };
 enum ChatMessage {
     Chat,
-    Rollback,
+    Rollback(usize),
     Switch(String),
     Exit,
     Error(String),
@@ -38,9 +35,17 @@ pub async fn cmd_server() {
                 let mut r = chat.clone().start_generate(&input.trim());
                 chat.chat_output(&mut r).await;
             }
-            ChatMessage::Rollback => {
-                let mut r = chat.clone().chat_rollback();
-                chat.chat_output(&mut r).await;
+            ChatMessage::Rollback(i)=> {
+                let r = chat.clone().chat_rollback(i);
+                match r {
+                    Ok(_) =>{},
+                    Err(e) => {
+                        println!("{}", e);
+                        continue;
+                    }
+                }
+                chat.chat_output(&mut r.unwrap()).await
+    
             }
             ChatMessage::Switch(id) => {
                 unsafe {
@@ -91,15 +96,23 @@ fn cmd_check(info: &str) -> ChatMessage {
                         .to_string(),
                 );
             }
+            "rollback" => {
+                
+                let num = info[index + 1..]
+                 .trim_end_matches(['\n', '\r', '\t'])
+                 .to_string().parse::<usize>();
+                match num {
+                    Ok(data) =>   return ChatMessage::Rollback(data),
+                    Err(e) => return ChatMessage::Error(format!("{}",e)),
+                }
+              
+            }
             _ => {
-                return ChatMessage::Error("未知错误，无法推理".to_owned());
+                return ChatMessage::Error("请在操作符后面添加数字".to_owned());
             }
         }
     } else {
         match info[1..].trim() {
-            "rollback" => {
-                return ChatMessage::Rollback;
-            }
             "exit" => {
                 return ChatMessage::Exit;
             }

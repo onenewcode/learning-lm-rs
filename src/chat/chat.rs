@@ -82,16 +82,20 @@ impl Chat<f32> {
         );
         kv.append_info(&v);
     }
-    pub fn chat_rollback(self: Arc<Self>) -> UnboundedReceiver<u32> {
+    pub fn chat_rollback(self: Arc<Self>,session_len:usize) -> Result<UnboundedReceiver<u32>,String>{
+        // 判断回滚的长度是否超出该会话的长度
+        if self.cache.lock().unwrap().kvc_len()< 2*session_len-1{
+            return Err("回滚长度超出该会话的长度".to_string());
+        }
         let input = {
             let mut kv = self.cache.lock().unwrap();
-            kv.rollback()
+            kv.rollback(session_len)
         };
         let (s, r) = unbounded_channel::<u32>();
         tokio::task::spawn_blocking(move || {
             Self::generate(&[input], self.cache.clone(), self.model.clone(), s);
         });
-        r
+        Ok(r)
     }
     pub  async fn chat_output(&self, r:&mut UnboundedReceiver<u32>){
         print_now!("chat id {}\n ",self.chat_id());

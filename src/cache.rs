@@ -1,7 +1,7 @@
 use crate::{kvcache::KVCache, ShutDownCallback, MY_LLAMA};
 use std::{
     collections::HashMap,
-    sync::{Arc, Mutex, OnceLock},
+    sync::{Arc, Mutex, OnceLock}, usize,
 };
 
 pub(crate) static mut CACHE_MANGER: OnceLock<CManger> = OnceLock::new();
@@ -61,9 +61,11 @@ impl<Storage: Default + Copy> Cache<Storage> {
         self.info.extend(info.iter());
     }
     // 回滚，返回推理的最后一个元素
-    pub fn rollback(&mut self) -> u32 {
+    pub fn rollback(&mut self,pop_len:usize) -> u32 {
         // 弹出元素
-        self.step.pop();
+        (0..pop_len).for_each(|_|{
+            self.step.pop();
+        });
         let last = self.step.last().unwrap();
         self.kv_cache.reset(*last - 1);
         // 清空info不需要的中的元素
