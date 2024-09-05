@@ -7,14 +7,31 @@ use crate::tensor::Tensor;
 // 定义一个 trait，包含必要的操作
 pub trait MyFloat: Copy+Default+Float+ std::ops::DivAssign+ std::iter::Sum + std::ops::AddAssign+ FromPrimitive
 {
-
+    //  浮动字符加载
+    fn from_myu8(n: &[u8]) -> Self;
+    // 用于获取所占字节，用于数据加载
+    fn t_size() -> usize;
 }
 
 // 为 f32 实现 Float trait
 impl MyFloat for f32 {
+    fn t_size() -> usize {
+        4
+    }
+    fn from_myu8(n:&[u8]) -> Self {
+        let bytes: [u8; 4] = n[0..4].try_into().unwrap();
+        f32::from_le_bytes(bytes)
+    }
 }
 // 为 f16 实现 Float trait（需要 half crate）
 impl MyFloat for f16 {
+     fn t_size() -> usize {
+        2
+    }
+    fn from_myu8(n:&[u8]) -> Self {
+        let bytes: [u8; 2] = n[0..2].try_into().unwrap();
+       f16::from_be_bytes(bytes)
+    }
 }
 
 /// 获取编码后，每个词代表的向量，组成一个矩阵

@@ -32,17 +32,14 @@ where T:MyFloat
             println!("{}", name);
         });
         let get_tensor = |name: &str| {
-            match safetensor.tensor(name) {
-                Ok(data) => {
-                    let p: usize = data.shape().iter().product();
-                    // 获取引用，只目前只转换成f32类型
-                    let new_data =
-                        unsafe { slice::from_raw_parts(data.data().as_ptr() as *const T, p) };
-                    // 生成新对象
-                    Tensor::new(Vec::from(new_data), &data.shape().to_vec())
-                }
-                Err(err) => Tensor::default(&Vec::new()),
+            let tensor_view = safetensor.tensor(name).expect("Failed to get tensor");
+            let mut data = vec![];
+            for chunk in tensor_view.data().chunks_exact(T::t_size()) {
+                let bytes = chunk.try_into().expect("slice with incorrect length");
+                let f = T::from_myu8(bytes);
+                data.push(f);
             }
+            Tensor::new(data, &tensor_view.shape().to_vec())
         };
         Self {
             embedding_table: get_tensor("model.embed_tokens.weight"),
