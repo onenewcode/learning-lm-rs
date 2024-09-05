@@ -16,6 +16,7 @@ enum ChatMessage {
     Switch(String),
     Exit,
     Error(String),
+    Help,
 }
 pub async fn cmd_server() {
     let stdin = io::stdin();
@@ -80,10 +81,20 @@ pub async fn cmd_server() {
                 };
             }
             ChatMessage::Exit => {
+                println!("程序正常退出，欢迎下次再见");
                 process::exit(0);
             }
+            ChatMessage::Help => {
+                println!(
+                    ">list           列出现存的会话及对话次数
+                    >rollback <nums>        会话回滚
+                    >switch <id>    切换至指定会话
+                    >help           打印帮助信息
+                    使用 /exit 或 Ctrl + C 结束程序"
+                )
+            }
             ChatMessage::Error(err) => {
-                println!("{}", err);
+                println!("{} 程序退出", err);
                 process::exit(0);
             }
         }
@@ -91,7 +102,7 @@ pub async fn cmd_server() {
 }
 fn cmd_check(info: &str) -> ChatMessage {
     if info.len() == 0 {
-        return ChatMessage::Error("输入文本为空，无法推理".to_owned());
+        return ChatMessage::Error("请在操作符后面添加数字".to_owned());
     }
     // 判断是否是命令
     if info.chars().next().unwrap() != '>' {
@@ -120,7 +131,7 @@ fn cmd_check(info: &str) -> ChatMessage {
               
             }
             _ => {
-                return ChatMessage::Error("请在操作符后面添加数字".to_owned());
+                return ChatMessage::Error("位置命令，不支持".to_owned());
             }
         }
     } else {
@@ -128,6 +139,7 @@ fn cmd_check(info: &str) -> ChatMessage {
             "exit" => {
                 return ChatMessage::Exit;
             }
+            "help"=>return  ChatMessage::Help,
             _ => {
                 return ChatMessage::Error("未知错误，无法推理".to_owned());
             }
