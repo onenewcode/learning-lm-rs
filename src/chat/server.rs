@@ -62,7 +62,10 @@ pub async fn cmd_server() {
                             println!("查询到缓存，转换到chat {}", id);
                             // f16代码
                             //  chat = Arc::new(Chat::<f16>::new_chat(id, ch.clone()));
+
                             chat = Arc::new(Chat::<f32>::new_chat(id, ch.clone()));
+                          // 输出历史内容
+                            chat.decode(&ch.lock().unwrap().get_info());
                         }
                         None => {
                             println!("未查询到缓存，新生成chat {}", id);
