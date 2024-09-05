@@ -1,4 +1,6 @@
 use crate::{
+    //todo f16代码
+    //     cache::{self, Cache, CACHE_MANGER_F16 as CACHE_MANGER}
     cache::{self, Cache, CACHE_MANGER_F32 as CACHE_MANGER},
     chat::chat::Chat,
 };
@@ -10,7 +12,7 @@ use std::{
 };
 enum ChatMessage {
     Chat,
-    Rollback,
+    Rollback(usize),
     Switch(String),
     Exit,
     Error(String),
@@ -18,6 +20,8 @@ enum ChatMessage {
 pub async fn cmd_server() {
     let stdin = io::stdin();
     let mut handle = stdin.lock();
+    // f16代码
+    // let mut chat = Arc::new(Chat::<f16>::new_chat("1".to_owned(), cache::Cache::<f16>::new_cmanger()));
     // 初始化默认Chat
     let mut chat = Arc::new(Chat::<f32>::new_chat("1".to_owned(), cache::Cache::<f32>::new_cmanger()));
     // 限制作用域
@@ -38,9 +42,16 @@ pub async fn cmd_server() {
                 let mut r = chat.clone().start_generate(&input.trim());
                 chat.chat_output(&mut r).await;
             }
-            ChatMessage::Rollback => {
-                let mut r = chat.clone().chat_rollback();
-                chat.chat_output(&mut r).await;
+            ChatMessage::Rollback(i)=> {
+                let r = chat.clone().chat_rollback(i);
+                match r {
+                    Ok(_) =>{},
+                    Err(e) => {
+                        println!("{}", e);
+                        continue;
+                    }
+                }
+                chat.chat_output(&mut r.unwrap()).await
             }
             ChatMessage::Switch(id) => {
                 unsafe {
@@ -48,15 +59,21 @@ pub async fn cmd_server() {
                         // 能够查询到缓存
                         Some(ch) => {
                             println!("查询到缓存，转换到chat {}", id);
+                            // f16代码
+                            //  chat = Arc::new(Chat::<f16>::new_chat(id, ch.clone()));
                             chat = Arc::new(Chat::<f32>::new_chat(id, ch.clone()));
                         }
                         None => {
                             println!("未查询到缓存，新生成chat {}", id);
+                            // f16代码
+                            // let tmp_cache = Cache::<f16>::new_cmanger();
                             let tmp_cache = Cache::<f32>::new_cmanger();
                             CACHE_MANGER
                                 .get_mut()
                                 .unwrap()
                                 .insert(id.clone(), tmp_cache.clone());
+                            // f16代码
+                            // chat = Arc::new(Chat::<f16>::new_chat(id, tmp_cache));
                             chat = Arc::new(Chat::<f32>::new_chat(id, tmp_cache));
                         }
                     }
@@ -91,15 +108,23 @@ fn cmd_check(info: &str) -> ChatMessage {
                         .to_string(),
                 );
             }
+            "rollback" => {
+                
+                let num = info[index + 1..]
+                 .trim_end_matches(['\n', '\r', '\t'])
+                 .to_string().parse::<usize>();
+                match num {
+                    Ok(data) =>   return ChatMessage::Rollback(data),
+                    Err(e) => return ChatMessage::Error(format!("{}",e)),
+                }
+              
+            }
             _ => {
-                return ChatMessage::Error("未知错误，无法推理".to_owned());
+                return ChatMessage::Error("请在操作符后面添加数字".to_owned());
             }
         }
     } else {
         match info[1..].trim() {
-            "rollback" => {
-                return ChatMessage::Rollback;
-            }
             "exit" => {
                 return ChatMessage::Exit;
             }

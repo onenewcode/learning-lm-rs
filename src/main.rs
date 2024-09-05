@@ -24,17 +24,20 @@ trait ShutDownCallback {
 #[tokio::main]
 async fn main() {
     // 加载模型
-    let project_dir = env!("CARGO_MANIFEST_DIR");
-    let model_dir = PathBuf::from(project_dir).join("models").join("chat");
-    // 初始化一些全局变量
-    let _ = MY_LLAMA_F32.set(Arc::new(model::Llama::<f32>::from_safetensors(&model_dir)));
-    let _ = MY_TOKENIZER.set(Arc::new(
-        Tokenizer::from_file(model_dir.join("tokenizer.json")).unwrap(),
-    ));
+ 
     match Cli::parse().command {
         Commands::Chat(a) => {
             use chat::server::cmd_server;
             if a.mode == "cmd" {
+                let model_dir = PathBuf::from(a.model);
+                let _ = MY_TOKENIZER.set(Arc::new(
+                    Tokenizer::from_file(model_dir.join("tokenizer.json")).unwrap(),
+                ));
+                // 初始化一些全局变量
+                let _ = MY_LLAMA_F32.set(Arc::new(model::Llama::from_safetensors(&model_dir)));
+                // todo f16 代码
+                // let _ = MY_LLAMA_F16.set(Arc::new(model::Llama::from_safetensors(&model_dir)));
+             
                 cmd_server().await;
             }
         }
@@ -60,8 +63,11 @@ struct ChatArgs {
     #[clap(short, long, default_value_t = 0)]
     session_id: u32,
     /// Model directory.
-    #[clap(short, long, default_value = "cmd")]
+    #[clap(long, default_value = "cmd")]
     mode: String,
+    #[clap(short,long, required=true)]
+    model: String,
+    
 }
 #[macro_export]
 macro_rules! print_now {

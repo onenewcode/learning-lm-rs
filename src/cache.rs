@@ -62,10 +62,12 @@ impl<Storage: Default + Copy> Cache<Storage> {
         // 追加元素
         self.info.extend(info.iter());
     }
-    // 回滚，返回推理的最后一个元素
-    pub fn rollback(&mut self) -> u32 {
+     // 回滚，返回推理的最后一个元素
+     pub fn rollback(&mut self,pop_len:usize) -> u32 {
         // 弹出元素
-        self.step.pop();
+        (0..pop_len).for_each(|_|{
+            self.step.pop();
+        });
         let last = self.step.last().unwrap();
         self.kv_cache.reset(*last - 1);
         // 清空info不需要的中的元素
