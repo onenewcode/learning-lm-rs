@@ -1,0 +1,41 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "chat32", 
+            "type": "lldb",
+            "request": "launch", 
+            "program": "${workspaceRoot}/target/debug/learning-lm-rust.exe", 
+            "args": ["chat","-m ../../models/chat"], 
+            "stopAtEntry": false, 
+            "cwd": "${workspaceRoot}",
+            "environment": [],
+            "preLaunchTask":"build",
+           
+        },
+        {
+            "name": "chatf16", 
+            "type": "lldb",
+            "request": "launch", 
+            "program": "${workspaceRoot}/target/debug/learning-lm-rust.exe", 
+            "args": ["chat","-m ../../models/chat_f16"], 
+            "stopAtEntry": false, 
+            "cwd": "${workspaceRoot}",
+            "environment": [],
+            "preLaunchTask":"build",
+           
+        },
+        {
+            "name": "story", 
+            "type": "lldb",
+            "request": "launch", 
+            "program": "${workspaceRoot}/target/debug/learning-lm-rust.exe", 
+            "args": ["chat","-m ../../models/story"], 
+            "stopAtEntry": false, 
+            "cwd": "${workspaceRoot}",
+            "environment": [],
+            "preLaunchTask":"build",
+           
+        }
+    ]
+}
