@@ -13,7 +13,7 @@ https://github.com/onenewcode/learning-lm-rs
 ![alt text](image-9.png)
 
 ### 使用方法
-首先拉去代码，建议直使用chat_new分支下面的代码。如果使用的是vscode可以可以直接使用.vascode文件，经行debug运行。
+首先拉去代码，建议直使用f16分支下面的代码。如果使用的是vscode可以可以直接使用.vascode文件，使用debug中的chat_f16运行。
 当然也可以通过以下的命令行运行我们的推理模型
 >cargo run chat 
 
