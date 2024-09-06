@@ -9,7 +9,13 @@ https://github.com/onenewcode/learning-lm-rs
 - 模型转换方面，使用了transformers框架，把基本的f32模型转换成f16模型。转换代码在f16分支下面的model.ipynb文件中。
 - f16方面，未使用第三方的half库，而是使用了一些非稳定特性，由于官方未实现部分迭代器的方法，需要自己手动实现
 
-## 演示效果
+### 演示效果
+![alt text](image-9.png)
+
+### 使用方法
+首先拉去代码，建议直使用chat_new分支下面的代码。如果使用的是vscode可以可以直接使用.vascode文件，经行debug运行。
+当然也可以通过以下的命令行运行我们的推理模型
+>cargo run chat 
 
 
 ## 单机模型
@@ -28,15 +34,15 @@ https://github.com/onenewcode/learning-lm-rs
 **缓存管理**
 缓存管理使用为了初始化全局的变量，这里使用了非稳定的OnceLock结构，从而减少对外部的依赖。同时缓存是map结构，以用户的sessionid为key，value中存储了本次会话推理的长度，推理的历史数据用于实现会话回滚。
 
-# 使用介绍
-首先拉去代码，建议直使用chat_new分支下面的代码。如果使用的是vscode可以可以直接使用.vascode文件，经行debug运行。
+### 使用介绍
+首先拉去代码，建议直使用chat_new分支下面的代码。如果使用的是vscode可以可以直接使用.vascode文件中的chat_32运行和调试我们的代码，经行debug运行。
 当然也可以通过以下的命令行运行我们的单机对话 
 >cargo run chat --model D:\project\rust\learning-lm-rs\models\chat
 
 --model 后面是模型文件的路径，以上命令也是在也是在文件根目录下运行的
 
 
-## 效果展示
+### 效果展示
 **查看支持的命令**
 我们可以通过 **>help** 查看我们当前单机推理模型支持的命令。
 ![alt text](image/image1.png)
@@ -59,11 +65,11 @@ https://github.com/onenewcode/learning-lm-rs
 ![alt text](image-3.png)
 
 **显示会话列表**
-我们可以通过 **>list** 命令，查看当前所有的对话id，可以用作 **>switch <id>**命令的切换。
+我们可以通过 **>list** 命令，查看当前所有的对话id，可以用作 **>switch id**命令的切换。
 ![alt text](image-4.png)
 
 **会话回滚**
-我们可以通过 **>rollback <num>>** 命令，回滚1一次对话。我们的对话是通过把一次请求和响应作为一轮对话。如果回滚的长度大于当前的对话长度，则会发生错误提示。
+我们可以通过 **>rollback num** 命令，回滚1一次对话。我们的对话是通过把一次请求和响应作为一轮对话。如果回滚的长度大于当前的对话长度，则会发生错误提示。
 
 超出长度的效果。
 ![alt text](image-5.png)
