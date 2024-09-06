@@ -14,6 +14,18 @@
            
         },
         {
+            "name": "chatf16", 
+            "type": "lldb",
+            "request": "launch", 
+            "program": "${workspaceRoot}/target/debug/learning-lm-rust.exe", 
+            "args": ["chat","-m ../../models/chat_f16"], 
+            "stopAtEntry": false, 
+            "cwd": "${workspaceRoot}",
+            "environment": [],
+            "preLaunchTask":"build",
+           
+        },
+        {
             "name": "story", 
             "type": "lldb",
             "request": "launch", 

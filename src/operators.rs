@@ -1,11 +1,12 @@
 use std::ops::{Add, Mul};
 use std::vec;
 
-use num_traits::{float::FloatCore, Float, FromPrimitive};
-use  half::f16;
 use crate::tensor::Tensor;
+use half::f16;
+use num_traits::{float::FloatCore, Float, FromPrimitive};
 // 定义一个 trait，包含必要的操作
-pub trait MyFloat: Copy+Default+Float+ std::ops::DivAssign+ std::iter::Sum + std::ops::AddAssign+ FromPrimitive
+pub trait MyFloat:
+    Copy + Default + Float + std::ops::DivAssign + std::iter::Sum + std::ops::AddAssign + FromPrimitive
 {
     //  浮动字符加载
     fn from_myu8(n: &[u8]) -> Self;
@@ -18,27 +19,26 @@ impl MyFloat for f32 {
     fn t_size() -> usize {
         4
     }
-    fn from_myu8(n:&[u8]) -> Self {
+    fn from_myu8(n: &[u8]) -> Self {
         let bytes: [u8; 4] = n[0..4].try_into().unwrap();
         f32::from_le_bytes(bytes)
     }
 }
 // 为 f16 实现 Float trait（需要 half crate）
 impl MyFloat for f16 {
-     fn t_size() -> usize {
+    fn t_size() -> usize {
         2
     }
-    fn from_myu8(n:&[u8]) -> Self {
+    fn from_myu8(n: &[u8]) -> Self {
         let bytes: [u8; 2] = n[0..2].try_into().unwrap();
-       f16::from_be_bytes(bytes)
+        f16::from_be_bytes(bytes)
     }
 }
 
 /// 获取编码后，每个词代表的向量，组成一个矩阵
 
 // get (row) vectors from a 2D table given a list of indices
-pub fn gather<T:MyFloat>(y: &mut Tensor<T>, indices: &Tensor<u32>, table: &Tensor<T>) {
-    
+pub fn gather<T: MyFloat>(y: &mut Tensor<T>, indices: &Tensor<u32>, table: &Tensor<T>) {
     let length = indices.size();
     let table_shape = table.shape();
     assert!(table_shape.len() == 2);
@@ -52,7 +52,7 @@ pub fn gather<T:MyFloat>(y: &mut Tensor<T>, indices: &Tensor<u32>, table: &Tenso
 }
 
 // RoPE: Rotary Positional Embedding
-pub fn rope<T:MyFloat>(y: &mut Tensor<T>, start_pos: usize, theta: T) {
+pub fn rope<T: MyFloat>(y: &mut Tensor<T>, start_pos: usize, theta: T) {
     let shape = y.shape();
     assert!(shape.len() == 3);
     let seq_len = shape[0];
@@ -66,7 +66,8 @@ pub fn rope<T:MyFloat>(y: &mut Tensor<T>, start_pos: usize, theta: T) {
                 let a = data[tok * n_heads * d + head * d + i];
                 let b = data[tok * n_heads * d + head * d + i + d / 2];
                 //自定义转换
-                let freq = T::from_usize(pos).unwrap() / theta.powf(T::from_usize(i * 2).unwrap() / T::from_usize(d).unwrap());
+                let freq = T::from_usize(pos).unwrap()
+                    / theta.powf(T::from_usize(i * 2).unwrap() / T::from_usize(d).unwrap());
                 let (sin, cos) = freq.sin_cos();
                 data[tok * n_heads * d + head * d + i] = a * cos - b * sin;
                 data[tok * n_heads * d + head * d + i + d / 2] = b * cos + a * sin;
@@ -77,7 +78,7 @@ pub fn rope<T:MyFloat>(y: &mut Tensor<T>, start_pos: usize, theta: T) {
 
 // softmax(x) = exp(x - max) / sum(exp(x - max))
 // y = softmax(mask(x))
-pub fn masked_softmax<T:MyFloat>(y: &mut Tensor<T>) {
+pub fn masked_softmax<T: MyFloat>(y: &mut Tensor<T>) {
     let ndim = y.shape().len();
     assert!(ndim >= 2);
     let seq_len = y.shape()[ndim - 2];
@@ -108,7 +109,7 @@ pub fn masked_softmax<T:MyFloat>(y: &mut Tensor<T>) {
         }
     }
 }
-pub fn rms_norm<T:MyFloat>(y: &mut Tensor<T>, x: &Tensor<T>, w: &Tensor<T>, epsilon: T) {
+pub fn rms_norm<T: MyFloat>(y: &mut Tensor<T>, x: &Tensor<T>, w: &Tensor<T>, epsilon: T) {
     let y_data = unsafe { y.data_mut() };
 
     let mut shape = vec![];
@@ -139,21 +140,26 @@ pub fn rms_norm<T:MyFloat>(y: &mut Tensor<T>, x: &Tensor<T>, w: &Tensor<T>, epsi
 
 // y = sigmoid(x) * x * yT
 // hint: this is an element-wise operation
-pub fn silu<T:MyFloat>(y: &mut Tensor<T>, x: &Tensor<T>) {
+pub fn silu<T: MyFloat>(y: &mut Tensor<T>, x: &Tensor<T>) {
     let len = y.size();
     assert!(len == x.size());
 
     let y_data = unsafe { y.data_mut() };
     let x_data = x.data();
     for i in 0..x_data.len() {
-        y_data[i] = y_data[i] * x_data[i] / (T::one()+(-x_data[i]).exp())
+        y_data[i] = y_data[i] * x_data[i] / (T::one() + (-x_data[i]).exp())
     }
 }
 
 // C = beta * C + alpha * A @ B^T
 // hint: You don't need to do an explicit transpose of B
-pub fn matmul_transb<T:MyFloat>(c: &mut Tensor<T>, beta: T, a: &Tensor<T>, b: &Tensor<T>, alpha: T)
-{
+pub fn matmul_transb<T: MyFloat>(
+    c: &mut Tensor<T>,
+    beta: T,
+    a: &Tensor<T>,
+    b: &Tensor<T>,
+    alpha: T,
+) {
     assert!(
         b.shape().len() == 2,
         "matmul_transb of dimensions must be at least 2"
@@ -184,8 +190,7 @@ pub fn matmul_transb<T:MyFloat>(c: &mut Tensor<T>, beta: T, a: &Tensor<T>, b: &T
 }
 // 向量乘法
 // t判断是否需要转置,alpha,参数暂未使用
-pub fn vec_multi<T:MyFloat>(c: &mut Tensor<T>, a: &Tensor<T>, b: &Tensor<T>, alpha: T, t: bool) 
-{
+pub fn vec_multi<T: MyFloat>(c: &mut Tensor<T>, a: &Tensor<T>, b: &Tensor<T>, alpha: T, t: bool) {
     // 判断c，长度是否大于二
     assert!(
         c.shape().len() > 2,
@@ -237,7 +242,7 @@ pub fn vec_multi<T:MyFloat>(c: &mut Tensor<T>, a: &Tensor<T>, b: &Tensor<T>, alp
 }
 // 只用于得分计算
 // a代表所处理的权重,b代表所要乘的向量
-pub fn vec_multi_wight<T:MyFloat>(c: &mut Tensor<T>, a: &Tensor<T>, b: &Tensor<T>) {
+pub fn vec_multi_wight<T: MyFloat>(c: &mut Tensor<T>, a: &Tensor<T>, b: &Tensor<T>) {
     assert!(
         b.shape().len() == 2,
         "matmul_transb of dimensions must be at least 2"
@@ -288,7 +293,7 @@ pub fn vec_multi_wight<T:MyFloat>(c: &mut Tensor<T>, a: &Tensor<T>, b: &Tensor<T
 
 // Dot product of two tensors (treated as vectors)
 #[allow(unused)]
-pub fn dot<T:MyFloat>(x: &Tensor<T>, y: &Tensor<T>) -> T {
+pub fn dot<T: MyFloat>(x: &Tensor<T>, y: &Tensor<T>) -> T {
     let len = x.size();
     assert!(len == y.size());
     let x_ = x.data();
@@ -301,14 +306,20 @@ pub fn dot<T:MyFloat>(x: &Tensor<T>, y: &Tensor<T>) -> T {
 }
 
 // Sample a index from a tensor (treated as a probability vector)
-pub fn random_sample<T:MyFloat>(x: &Tensor<T>, top_p: f32, top_k: u32, temperature: f32) -> u32 {
+pub fn random_sample<T: MyFloat>(x: &Tensor<T>, top_p: f32, top_k: u32, temperature: f32) -> u32 {
     assert!(x.shape()[x.shape().len() - 1] == x.size());
     if temperature <= 0. || top_k < 2 || top_p <= 0. {
         return x
             .data()
             .iter()
             .enumerate()
-            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
+            .max_by(|(_, a), (_, b)| {
+             match   a.partial_cmp(b){
+                Some(r) => r,
+                None => panic!("无法比较"),
+                }
+            }
+        )
             .unwrap()
             .0 as _;
     }
@@ -349,10 +360,7 @@ pub fn random_sample<T:MyFloat>(x: &Tensor<T>, top_p: f32, top_k: u32, temperatu
         .data()
         .iter()
         .enumerate()
-        .map(|(u,t)|
-            {
-                Probability::from((u,&t.to_f32().unwrap()))
-            })
+        .map(|(u, t)| Probability::from((u, &t.to_f32().unwrap())))
         .collect::<Vec<_>>();
     logits.sort_unstable();
     let max = core::mem::replace(&mut logits[0].val, 1.);

@@ -1,8 +1,8 @@
 use core::slice;
 use std::alloc::LayoutErr;
 
-use crate::{config::LlamaConfigJson, operators::MyFloat};
 use crate::tensor::Tensor;
+use crate::{config::LlamaConfigJson, operators::MyFloat};
 use safetensors::{SafeTensors, View};
 pub struct LLamaParams<T> {
     // token_id to embedding lookup table
@@ -23,8 +23,9 @@ pub struct LLamaParams<T> {
     pub lm_head: Tensor<T>,   // (vocab_size, dim)
 }
 
-impl <T>LLamaParams<T>
-where T:MyFloat
+impl<T> LLamaParams<T>
+where
+    T: MyFloat,
 {
     pub fn from_safetensors(safetensor: &SafeTensors, config: &LlamaConfigJson) -> Self {
         let layers = config.num_hidden_layers;

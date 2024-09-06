@@ -28,8 +28,9 @@ pub struct Llama<T> {
     bos_token_id: u32, // start token id
     eos_token_id: u32, // end token id
 }
-impl <T>Llama<T>
-where T:MyFloat
+impl<T> Llama<T>
+where
+    T: MyFloat,
 {
     pub fn from_safetensors(model_dir: impl AsRef<Path>) -> Self {
         let config = File::open(model_dir.as_ref().join("config.json")).unwrap();
@@ -99,9 +100,27 @@ where T:MyFloat
             let k = &mut cache.k_cache(layer, past_seq_len); // (seq, n_kv_h * dqkv)
             let v = &mut cache.v_cache(layer, past_seq_len); // (seq, n_kv_h * dqkv)
                                                              // 这里我们的wq的矩阵和
-            OP::matmul_transb(q, T::zero(), &hidden_states, &self.params.wq[layer], T::one());
-            OP::matmul_transb(k, T::zero(), &hidden_states, &self.params.wk[layer], T::one());
-            OP::matmul_transb(v, T::zero(), &hidden_states, &self.params.wv[layer], T::one());
+            OP::matmul_transb(
+                q,
+                T::zero(),
+                &hidden_states,
+                &self.params.wq[layer],
+                T::one(),
+            );
+            OP::matmul_transb(
+                k,
+                T::zero(),
+                &hidden_states,
+                &self.params.wk[layer],
+                T::one(),
+            );
+            OP::matmul_transb(
+                v,
+                T::zero(),
+                &hidden_states,
+                &self.params.wv[layer],
+                T::one(),
+            );
             //  每个词向量对应的查询矩阵
             OP::rope::<T>(
                 q.reshape(&vec![seq_len, self.n_q_h, self.dqkv]),
@@ -171,7 +190,13 @@ where T:MyFloat
             T::from_f32(self.eps).unwrap(),
         );
 
-        OP::matmul_transb(&mut logits, T::zero(), &hidden_states, &self.params.lm_head, T::one());
+        OP::matmul_transb(
+            &mut logits,
+            T::zero(),
+            &hidden_states,
+            &self.params.lm_head,
+            T::one(),
+        );
 
         logits
     }
@@ -233,7 +258,6 @@ where T:MyFloat
 // ) {
 // }
 
-
 fn mlp<T>(
     residual: &mut Tensor<T>,      // 4 2
     hidden_states: &mut Tensor<T>, //4 2
@@ -244,8 +268,8 @@ fn mlp<T>(
     w_gate: &Tensor<T>,            // 3,2
     rms_w: &Tensor<T>,             // 2
     eps: T,
-) 
-where T:MyFloat
+) where
+    T: MyFloat,
 {
     rms_norm(hidden_states, residual, rms_w, eps);
     matmul_transb(gate, T::zero(), hidden_states, w_gate, T::one());

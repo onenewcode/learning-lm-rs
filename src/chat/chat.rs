@@ -1,16 +1,15 @@
-use crate::{cache::Cache, model::Llama, operators::MyFloat, print_now, MY_LLAMA_F16, MY_LLAMA_F32, MY_TOKENIZER};
+use crate::{
+    cache::Cache, model::Llama, operators::MyFloat, print_now, MY_LLAMA_F16, MY_LLAMA_F32,
+    MY_TOKENIZER,
+};
+use half::f16;
 use std::sync::{Arc, Mutex};
 use tokenizers::Tokenizer;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
-use half::f16;
 // 固定模板
-const RENDER: &str = "<|im_start|>system
-{system_message}<|im_end|>
-<|im_start|>user
-{user_message}<|im_end|>
-<|im_start|>";
+const RENDER: &str = "";
 const ROLE: &str = "assistant <s>";
-pub struct Chat<C: Default + Copy+MyFloat> {
+pub struct Chat<C: Default + Copy + MyFloat> {
     // 对话id
     id: String,
     // 管理对话历史 todoC
@@ -40,7 +39,7 @@ impl Chat<f32> {
     pub fn new_chat(id: String, cache: Arc<Mutex<Cache<f32>>>) -> Self {
         Chat {
             id,
-            model:MY_LLAMA_F32.get().unwrap().clone(),
+            model: MY_LLAMA_F32.get().unwrap().clone(),
             cache: cache,
             tokenizer: MY_TOKENIZER.get().unwrap().clone(),
         }
@@ -83,14 +82,17 @@ impl Chat<f32> {
         );
         kv.append_info(&v);
     }
-    pub fn chat_rollback(self: Arc<Self>,session_len:usize) -> Result<UnboundedReceiver<u32>,String>{
+    pub fn chat_rollback(
+        self: Arc<Self>,
+        session_len: usize,
+    ) -> Result<UnboundedReceiver<u32>, String> {
         // 判断回滚的长度是否超出该会话的长度
-        if self.cache.lock().unwrap().kvc_len()< 2*session_len-1{
+        if self.cache.lock().unwrap().get_step_len() < 2 * session_len - 1 {
             return Err("回滚长度超出该会话的长度".to_string());
         }
         let input = {
             let mut kv = self.cache.lock().unwrap();
-            kv.rollback(session_len)
+            kv.rollback(2 * session_len - 1)
         };
         let (s, r) = unbounded_channel::<u32>();
         tokio::task::spawn_blocking(move || {
@@ -98,8 +100,8 @@ impl Chat<f32> {
         });
         Ok(r)
     }
-    pub  async fn chat_output(&self, r:&mut UnboundedReceiver<u32>){
-        print_now!("chat id {}\n ",self.chat_id());
+    pub async fn chat_output(&self, r: &mut UnboundedReceiver<u32>) {
+        print_now!("chat id {}\n ", self.chat_id());
         loop {
             match r.recv().await {
                 Some(v) => {
@@ -141,7 +143,7 @@ impl Chat<f16> {
     pub fn new_chat(id: String, cache: Arc<Mutex<Cache<f16>>>) -> Self {
         Chat {
             id,
-            model:MY_LLAMA_F16.get().unwrap().clone(),
+            model: MY_LLAMA_F16.get().unwrap().clone(),
             cache: cache,
             tokenizer: MY_TOKENIZER.get().unwrap().clone(),
         }
@@ -184,14 +186,17 @@ impl Chat<f16> {
         );
         kv.append_info(&v);
     }
-    pub fn chat_rollback(self: Arc<Self>,session_len:usize) -> Result<UnboundedReceiver<u32>,String>{
+    pub fn chat_rollback(
+        self: Arc<Self>,
+        session_len: usize,
+    ) -> Result<UnboundedReceiver<u32>, String> {
         // 判断回滚的长度是否超出该会话的长度
-        if self.cache.lock().unwrap().kvc_len()< 2*session_len-1{
+        if self.cache.lock().unwrap().get_step_len() < 2 * session_len - 1 {
             return Err("回滚长度超出该会话的长度".to_string());
         }
         let input = {
             let mut kv = self.cache.lock().unwrap();
-            kv.rollback(session_len)
+            kv.rollback( 2 * session_len - 1 )
         };
         let (s, r) = unbounded_channel::<u32>();
         tokio::task::spawn_blocking(move || {
@@ -199,8 +204,8 @@ impl Chat<f16> {
         });
         Ok(r)
     }
-    pub  async fn chat_output(&self, r:&mut UnboundedReceiver<u32>){
-        print_now!("chat id {}\n ",self.chat_id());
+    pub async fn chat_output(&self, r: &mut UnboundedReceiver<u32>) {
+        print_now!("chat id {}\n ", self.chat_id());
         loop {
             match r.recv().await {
                 Some(v) => {

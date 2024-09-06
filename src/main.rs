@@ -12,9 +12,9 @@ mod operators;
 mod params;
 mod tensor;
 use clap::{Args, Parser, Subcommand};
+use half::f16;
 use model::Llama;
 use tokenizers::Tokenizer;
-use half::f16;
 static MY_LLAMA_F32: OnceLock<Arc<Llama<f32>>> = OnceLock::new();
 static MY_LLAMA_F16: OnceLock<Arc<Llama<f16>>> = OnceLock::new();
 static MY_TOKENIZER: OnceLock<Arc<Tokenizer>> = OnceLock::new();
@@ -24,7 +24,7 @@ trait ShutDownCallback {
 #[tokio::main]
 async fn main() {
     // 加载模型
- 
+
     match Cli::parse().command {
         Commands::Chat(a) => {
             use chat::server::cmd_server;
@@ -34,10 +34,11 @@ async fn main() {
                     Tokenizer::from_file(model_dir.join("tokenizer.json")).unwrap(),
                 ));
                 // 初始化一些全局变量
-                let _ = MY_LLAMA_F32.set(Arc::new(model::Llama::from_safetensors(&model_dir)));
-                // todo f16 代码
-                // let _ = MY_LLAMA_F16.set(Arc::new(model::Llama::from_safetensors(&model_dir)));
-             
+                // f32 代码
+                // let _ = MY_LLAMA_F32.set(Arc::new(model::Llama::from_safetensors(&model_dir)));
+                // f16 代码
+                let _ = MY_LLAMA_F16.set(Arc::new(model::Llama::from_safetensors(&model_dir)));
+
                 cmd_server().await;
             }
         }
@@ -65,9 +66,8 @@ struct ChatArgs {
     /// Model directory.
     #[clap(long, default_value = "cmd")]
     mode: String,
-    #[clap(short,long, required=true)]
+    #[clap(short, long, required = true)]
     model: String,
-    
 }
 #[macro_export]
 macro_rules! print_now {

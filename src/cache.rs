@@ -7,7 +7,7 @@ use std::{
 
 pub(crate) static mut CACHE_MANGER_F32: OnceLock<CManger<f32>> = OnceLock::new();
 pub(crate) static mut CACHE_MANGER_F16: OnceLock<CManger<f16>> = OnceLock::new();
-type CManger<T:MyFloat> = HashMap<String, Arc<Mutex<Cache<T>>>>;
+type CManger<T: MyFloat> = HashMap<String, Arc<Mutex<Cache<T>>>>;
 // impl ShutDownCallback for CManger {
 //     // todo 持久化
 //     fn shut_down_callback(&self) {
@@ -62,10 +62,10 @@ impl<Storage: Default + Copy> Cache<Storage> {
         // 追加元素
         self.info.extend(info.iter());
     }
-     // 回滚，返回推理的最后一个元素
-     pub fn rollback(&mut self,pop_len:usize) -> u32 {
+    // 回滚，返回推理的最后一个元素
+    pub fn rollback(&mut self, pop_len: usize) -> u32 {
         // 弹出元素
-        (0..pop_len).for_each(|_|{
+        (0..pop_len).for_each(|_| {
             self.step.pop();
         });
         let last = self.step.last().unwrap();
@@ -73,6 +73,10 @@ impl<Storage: Default + Copy> Cache<Storage> {
         // 清空info不需要的中的元素
         self.info.truncate(*last);
         *self.info.last().unwrap()
+    }
+    // 获取步长
+    pub fn get_step_len(&self) -> usize {
+        self.step.len()
     }
 }
 impl Cache<f32> {
