@@ -1,8 +1,8 @@
 use crate::{
     // f16代码
-    cache::{self, Cache, CACHE_MANGER_F16 as CACHE_MANGER},
+    // cache::{self, Cache, CACHE_MANGER_F16 as CACHE_MANGER},
     //  f32 代码
-    // cache::{self, Cache, CACHE_MANGER_F32 as CACHE_MANGER},
+    cache::{self, Cache, CACHE_MANGER_F32 as CACHE_MANGER},
     chat::chat::Chat,
 };
 use half::f16;
@@ -26,15 +26,15 @@ pub async fn cmd_server() {
     let mut handle = stdin.lock();
     // 初始化默认Chat
     // f16代码
-    let mut chat = Arc::new(Chat::<f16>::new_chat(
-        "1".to_owned(),
-        cache::Cache::<f16>::new_cmanger(),
-    ));
-    // f32 代码
-    // let mut chat = Arc::new(Chat::<f32>::new_chat(
+    // let mut chat = Arc::new(Chat::<f16>::new_chat(
     //     "1".to_owned(),
-    //     cache::Cache::<f32>::new_cmanger(),
+    //     cache::Cache::<f16>::new_cmanger(),
     // ));
+    // f32 代码
+    let mut chat = Arc::new(Chat::<f32>::new_chat(
+        "1".to_owned(),
+        cache::Cache::<f32>::new_cmanger(),
+    ));
     // 限制作用域
     {
         // 初始化
@@ -71,9 +71,9 @@ pub async fn cmd_server() {
                         Some(ch) => {
                             println!("查询到缓存，转换到chat {}", id);
                             // f16代码
-                             chat = Arc::new(Chat::<f16>::new_chat(id, ch.clone()));
+                            //  chat = Arc::new(Chat::<f16>::new_chat(id, ch.clone()));
                             // f32 代码
-                            // chat = Arc::new(Chat::<f32>::new_chat(id, ch.clone()));
+                            chat = Arc::new(Chat::<f32>::new_chat(id, ch.clone()));
                             // 输出历史内容
                             println!(
                                 "历史对话数据 {}",
@@ -83,17 +83,17 @@ pub async fn cmd_server() {
                         None => {
                             println!("未查询到缓存，新生成chat {}", id);
                             // f16代码
-                            let tmp_cache = Cache::<f16>::new_cmanger();
+                            // let tmp_cache = Cache::<f16>::new_cmanger();
                             // f32 代码
-                            // let tmp_cache = Cache::<f32>::new_cmanger();
+                            let tmp_cache = Cache::<f32>::new_cmanger();
                             CACHE_MANGER
                                 .get_mut()
                                 .unwrap()
                                 .insert(id.clone(), tmp_cache.clone());
                             // f16代码
-                            chat = Arc::new(Chat::<f16>::new_chat(id, tmp_cache));
+                            // chat = Arc::new(Chat::<f16>::new_chat(id, tmp_cache));
                             // f32 代码
-                            // chat = Arc::new(Chat::<f32>::new_chat(id, tmp_cache));
+                            chat = Arc::new(Chat::<f32>::new_chat(id, tmp_cache));
                         }
                     }
                 };

@@ -35,9 +35,9 @@ async fn main() {
                 ));
                 // 初始化一些全局变量
                 // f32 代码
-                // let _ = MY_LLAMA_F32.set(Arc::new(model::Llama::from_safetensors(&model_dir)));
+                let _ = MY_LLAMA_F32.set(Arc::new(model::Llama::from_safetensors(&model_dir)));
                 // f16 代码
-                let _ = MY_LLAMA_F16.set(Arc::new(model::Llama::from_safetensors(&model_dir)));
+                // let _ = MY_LLAMA_F16.set(Arc::new(model::Llama::from_safetensors(&model_dir)));
 
                 cmd_server().await;
             }

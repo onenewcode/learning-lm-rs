@@ -1,9 +1,7 @@
-use std::ops::{Add, Mul};
 use std::vec;
-
 use crate::tensor::Tensor;
 use half::f16;
-use num_traits::{float::FloatCore, Float, FromPrimitive};
+use num_traits::{Float, FromPrimitive};
 // 定义一个 trait，包含必要的操作
 pub trait MyFloat:
     Copy + Default + Float + std::ops::DivAssign + std::iter::Sum + std::ops::AddAssign + FromPrimitive
@@ -308,6 +306,7 @@ pub fn dot<T: MyFloat>(x: &Tensor<T>, y: &Tensor<T>) -> T {
 // Sample a index from a tensor (treated as a probability vector)
 pub fn random_sample<T: MyFloat>(x: &Tensor<T>, top_p: f32, top_k: u32, temperature: f32) -> u32 {
     assert!(x.shape()[x.shape().len() - 1] == x.size());
+    // todo 使用half的半精度partial_cmp的f16会出现无法比较的问题 
     if temperature <= 0. || top_k < 2 || top_p <= 0. {
         return x
             .data()
