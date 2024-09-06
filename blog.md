@@ -9,7 +9,8 @@ https://github.com/onenewcode/learning-lm-rs
 - 模型转换方面，使用了transformers框架，把基本的f32模型转换成f16模型。转换代码在f16分支下面的model.ipynb文件中。
 - f16方面，未使用第三方的half库，而是使用了一些非稳定特性，由于官方未实现部分迭代器的方法，需要自己手动实现
 
-##
+## 演示效果
+
 
 ## 单机模型
 ### 功能介绍
