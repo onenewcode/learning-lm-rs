@@ -7,7 +7,11 @@ use std::sync::{Arc, Mutex};
 use tokenizers::Tokenizer;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 // 固定模板
-const RENDER: &str = "";
+const RENDER: &str = "<|im_start|>system
+{system_message}<|im_end|>
+<|im_start|>user
+{user_message}<|im_end|>
+<|im_start|>";
 const ROLE: &str = "assistant <s>";
 pub struct Chat<C: Default + Copy + MyFloat> {
     // 对话id

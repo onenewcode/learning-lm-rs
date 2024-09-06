@@ -9,6 +9,7 @@ https://github.com/onenewcode/learning-lm-rs
 - 模型转换方面，使用了transformers框架，把基本的f32模型转换成f16模型。转换代码在f16分支下面的model.ipynb文件中。
 - f16方面，未使用第三方的half库，而是使用了一些非稳定特性，由于官方未实现部分迭代器的方法，需要自己手动实现
 
+
 ## 单机模型
 ### 功能介绍
 - 会话切换
@@ -73,5 +74,3 @@ https://github.com/onenewcode/learning-lm-rs
 我们可以通过 **>exit** 命令，退出程序。
 ![alt text](image-8.png)
 
-**加载半精度模型**
-加载半精度模型，由于代码原因，需要手动改写代码，需要把几处的加载代码改为半精度类型，
