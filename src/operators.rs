@@ -1,4 +1,4 @@
-use std::vec;
+use std::{cmp::Ordering, vec};
 use crate::tensor::Tensor;
 use half::f16;
 use num_traits::{Float, FromPrimitive};
@@ -29,7 +29,7 @@ impl MyFloat for f16 {
     }
     fn from_myu8(n: &[u8]) -> Self {
         let bytes: [u8; 2] = n[0..2].try_into().unwrap();
-        f16::from_be_bytes(bytes)
+        f16::from_le_bytes(bytes)
     }
 }
 
@@ -313,12 +313,14 @@ pub fn random_sample<T: MyFloat>(x: &Tensor<T>, top_p: f32, top_k: u32, temperat
             .iter()
             .enumerate()
             .max_by(|(_, a), (_, b)| {
-             match   a.partial_cmp(b){
-                Some(r) => r,
-                None => panic!("无法比较"),
+                if a > b {
+                    Ordering::Greater
+                } else if a < b {
+                    Ordering::Less
+                } else {
+                    Ordering::Equal
                 }
-            }
-        )
+    })
             .unwrap()
             .0 as _;
     }
