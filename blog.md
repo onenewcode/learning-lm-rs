@@ -41,44 +41,52 @@ https://github.com/onenewcode/learning-lm-rs
 
 --model 后面是模型文件的路径，以上命令也是在也是在文件根目录下运行的
 
+### 不同类型支持
+因为难以同时实现不同类型的缓存管理，所以在加载不同类型的模型时，需要添加注释一些代码。代码主要是在main.rs和server.rs中。
+需要支持f16或者f32模型时，需要修改main.rs和server.rs中的代码。
+需要修改的代码如图。
 
+![alt text](image/image-89.png)
+![alt text](image/image-90.png)
+![alt text](image/image-91.png)
+![alt text](image/image-92.png)
 ### 效果展示
 **查看支持的命令**
 我们可以通过 **>help** 查看我们当前单机推理模型支持的命令。
 ![alt text](image/image1.png)
 **对话界面**
-![alt text](image/image.png)
+![alt text](image/image0.png)
 我们可以在对话界面输入任意的对话内容，对话界面会首先输出我们当前对话的id，如图所框，接下来便会异步的输出我们的对话内容。
 
 **对话切换**
 对话切换的时候，通过 **>switch 1** 命令，切换到id为1的对话。默认我们的对话id为1。
-![alt text](image.png)
+![alt text](image/image.png)
 
 如果我们在使用 **>switch** 命令，我们可以切换到任意一个对话。如果后面没有数字系统将会触发err，退出整个推理程序。
-![alt text](image-1.png)
+![alt text](image/image-1.png)
 
 在切换到新的对话时，如果是输入的是新的id，则会新生成一个对话，如果输入的是已经存在的id，则会输出历史的对话。
 
 新生成的对话
-![alt text](image-2.png)
+![alt text](image/image-2.png)
 已经存在的对话
-![alt text](image-3.png)
+![alt text](image/image-3.png)
 
 **显示会话列表**
 我们可以通过 **>list** 命令，查看当前所有的对话id，可以用作 **>switch id**命令的切换。
-![alt text](image-4.png)
+![alt text](image/image-4.png)
 
 **会话回滚**
 我们可以通过 **>rollback num** 命令，回滚1一次对话。我们的对话是通过把一次请求和响应作为一轮对话。如果回滚的长度大于当前的对话长度，则会发生错误提示。
 
 超出长度的效果。
-![alt text](image-5.png)
+![alt text](image/image-5.png)
 
 正常效果
-![alt text](image-6.png)
-![alt text](image-7.png)
+![alt text](image/image-6.png)
+![alt text](image/image-7.png)
 
 **退出程序**
 我们可以通过 **>exit** 命令，退出程序。
-![alt text](image-8.png)
+![alt text](image/image-8.png)
 

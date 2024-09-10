@@ -24,6 +24,9 @@ pub struct Chat<C: Default + Copy + MyFloat> {
     cache: Arc<Mutex<Cache<C>>>,
     // 最大长度
 }
+trait DisplayContent {
+    fn display(&self);
+}
 impl Chat<f32> {
     pub fn new(
         id: String,
@@ -200,7 +203,7 @@ impl Chat<f16> {
         }
         let input = {
             let mut kv = self.cache.lock().unwrap();
-            kv.rollback( 2 * session_len - 1 )
+            kv.rollback(2 * session_len - 1)
         };
         let (s, r) = unbounded_channel::<u32>();
         tokio::task::spawn_blocking(move || {
